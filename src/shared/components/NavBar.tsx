@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { FiChevronDown, FiMenu, FiBook, FiUsers } from 'react-icons/fi'
-import { GiSwordsPower, GiPokecog } from 'react-icons/gi'
-import { BsQuestionCircleFill } from 'react-icons/bs'
-import { MdOutlineCropFree } from 'react-icons/md'
+import { FiChevronDown, FiMenu } from 'react-icons/fi'
+import { GiSwordsPower } from 'react-icons/gi'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,20 +14,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { GAME_REGISTRY } from '@/registry/game-registry'
 
-const GAMES: GameEntry[] = [
-  { label: 'Pokémon Wordle', icon: <GiPokecog size={15} />, href: '#' },
-  { label: "Who's That Pokémon?", icon: <BsQuestionCircleFill size={15} />, href: '#' },
-  { label: 'Partial Image', icon: <MdOutlineCropFree size={15} />, href: '#' },
-]
+// IDs that get their own top-level nav button (not in the Games dropdown)
+const TOP_LEVEL_IDS = ['pokedex', 'team-builder']
+// IDs that live inside the Games dropdown
+const GAME_DROPDOWN_IDS = ['wordle', 'whos-that-pokemon', 'partial-image']
 
-type ActivePage = 'pokedex' | 'team-builder' | string
+const topLevelModules = GAME_REGISTRY.filter((m) => TOP_LEVEL_IDS.includes(m.id))
+const gameDropdownModules = GAME_REGISTRY.filter((m) => GAME_DROPDOWN_IDS.includes(m.id))
 
-interface GameEntry {
-  label: string
-  icon: React.ReactNode
-  href: string
-}
+type ActivePage = string
 
 export function NavBar() {
   const [active, setActive] = useState<ActivePage>('')
@@ -49,13 +44,18 @@ export function NavBar() {
 
       {/* Desktop nav */}
       <div className="hidden md:flex items-center gap-1">
-        {/* Pokédex */}
-        <NavButton
-          icon={<FiBook size={16} />}
-          label="Pokédex"
-          active={active === 'pokedex'}
-          onClick={() => setActive('pokedex')}
-        />
+        {/* Top-level modules (Pokédex, Team Builder) — rendered before the dropdown */}
+        {topLevelModules
+          .filter((m) => m.id !== 'team-builder')
+          .map((mod) => (
+            <NavButton
+              key={mod.id}
+              icon={<mod.icon size={16} />}
+              label={mod.name}
+              active={active === mod.id}
+              onClick={() => setActive(mod.id)}
+            />
+          ))}
 
         {/* Games dropdown */}
         <DropdownMenu>
@@ -77,31 +77,36 @@ export function NavBar() {
             align="start"
             className="bg-zinc-900 border border-zinc-800 rounded-xl min-w-48"
           >
-            {GAMES.map((game) => (
+            {gameDropdownModules.map((mod) => (
               <DropdownMenuItem
-                key={game.label}
-                onClick={() => setActive(`game-${game.label}`)}
+                key={mod.id}
+                onClick={() => setActive(`game-${mod.id}`)}
                 className={`
                   gap-2.5 cursor-pointer rounded-lg
-                  ${active === `game-${game.label}`
+                  ${active === `game-${mod.id}`
                     ? 'bg-zinc-700 text-zinc-100'
                     : 'text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100'}
                 `}
               >
-                <span>{game.icon}</span>
-                {game.label}
+                <mod.icon size={16} />
+                {mod.name}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Team Builder */}
-        <NavButton
-          icon={<FiUsers size={16} />}
-          label="Team Builder"
-          active={active === 'team-builder'}
-          onClick={() => setActive('team-builder')}
-        />
+        {/* Team Builder — rendered after the dropdown */}
+        {topLevelModules
+          .filter((m) => m.id === 'team-builder')
+          .map((mod) => (
+            <NavButton
+              key={mod.id}
+              icon={<mod.icon size={16} />}
+              label={mod.name}
+              active={active === mod.id}
+              onClick={() => setActive(mod.id)}
+            />
+          ))}
       </div>
 
       {/* Mobile hamburger */}
@@ -125,37 +130,47 @@ export function NavBar() {
 
             <div className="px-3 py-4 flex flex-col gap-1">
               {/* Pokédex */}
-              <MobileNavButton
-                icon={<FiBook size={16} />}
-                label="Pokédex"
-                active={active === 'pokedex'}
-                onClick={() => { setActive('pokedex'); setMobileOpen(false) }}
-              />
+              {topLevelModules
+                .filter((m) => m.id !== 'team-builder')
+                .map((mod) => (
+                  <MobileNavButton
+                    key={mod.id}
+                    icon={<mod.icon size={16} />}
+                    label={mod.name}
+                    active={active === mod.id}
+                    onClick={() => { setActive(mod.id); setMobileOpen(false) }}
+                  />
+                ))}
 
               {/* Games section */}
               <div className="pt-2">
                 <p className="px-3 pb-1 text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Games
                 </p>
-                {GAMES.map((game) => (
+                {gameDropdownModules.map((mod) => (
                   <MobileNavButton
-                    key={game.label}
-                    icon={game.icon}
-                    label={game.label}
-                    active={active === `game-${game.label}`}
-                    onClick={() => { setActive(`game-${game.label}`); setMobileOpen(false) }}
+                    key={mod.id}
+                    icon={<mod.icon size={16} />}
+                    label={mod.name}
+                    active={active === `game-${mod.id}`}
+                    onClick={() => { setActive(`game-${mod.id}`); setMobileOpen(false) }}
                   />
                 ))}
               </div>
 
               {/* Team Builder */}
               <div className="pt-2">
-                <MobileNavButton
-                  icon={<FiUsers size={16} />}
-                  label="Team Builder"
-                  active={active === 'team-builder'}
-                  onClick={() => { setActive('team-builder'); setMobileOpen(false) }}
-                />
+                {topLevelModules
+                  .filter((m) => m.id === 'team-builder')
+                  .map((mod) => (
+                    <MobileNavButton
+                      key={mod.id}
+                      icon={<mod.icon size={16} />}
+                      label={mod.name}
+                      active={active === mod.id}
+                      onClick={() => { setActive(mod.id); setMobileOpen(false) }}
+                    />
+                  ))}
               </div>
             </div>
           </SheetContent>
