@@ -61,10 +61,10 @@ export function computeAttributeFeedback(
   guessed: PokemonDetail,
   mystery: PokemonDetail,
 ): AttributesFeedbackRow {
-  const guessedType1 = guessed.types[0];
-  const guessedType2 = guessed.types[1];
-  const mysteryType1 = mystery.types[0];
-  const mysteryType2 = mystery.types[1];
+  const guessedType1 = guessed.types[0] ?? undefined;
+  const guessedType2 = guessed.types[1] ?? undefined;
+  const mysteryType1 = mystery.types[0] ?? undefined;
+  const mysteryType2 = mystery.types[1] ?? undefined;
 
   return {
     mode: 'attributes',
@@ -73,13 +73,19 @@ export function computeAttributeFeedback(
       name: guessed.name,
       sprite: guessed.sprite,
     },
+    guessedValues: {
+      type1: guessedType1 ?? null,
+      type2: guessedType2 ?? null,
+      generation: guessed.generation,
+      color: guessed.color,
+      eggGroup: guessed.eggGroups[0] ?? '',
+      evolutionStage: guessed.evolutionStage,
+    },
     type1: compareType(guessedType1, mysteryType1, mystery.types),
     type2: compareType(guessedType2, mysteryType2, mystery.types),
     generation: compareScalar(guessed.generation, mystery.generation),
     color: compareScalar(guessed.color, mystery.color),
     eggGroup: compareEggGroup(guessed.eggGroups, mystery.eggGroups),
     evolutionStage: compareScalar(guessed.evolutionStage, mystery.evolutionStage),
-    height: compareScalar(guessed.height, mystery.height),
-    weight: compareScalar(guessed.weight, mystery.weight),
   };
 }
