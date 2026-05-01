@@ -128,3 +128,66 @@
     @apply font-sans;
     }
 }
+
+/* ── Wordle animations ─────────────────────────────────────────────────────── */
+
+@keyframes wordle-cell-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wordle-banner-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  70% {
+    transform: translateY(2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wordle-row-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wordle-cell-animate {
+  animation: wordle-cell-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.wordle-banner-animate {
+  animation: wordle-banner-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wordle-row-animate {
+  animation: wordle-row-in 0.22s ease-out both;
+}
+
+@keyframes wordle-cell-flip {
+  0% { transform: rotateX(0deg); }
+  50% { transform: rotateX(-90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+.wordle-cell-correct {
+  animation: wordle-cell-flip 0.4s ease-in-out both;
+}
