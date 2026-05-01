@@ -1,1 +1,4 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/h"
 
+node scripts/validate-branch-name.mjs
