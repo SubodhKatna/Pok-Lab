@@ -1,4 +1,19 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/h"
 
-node scripts/validate-branch-name.mjs
+echo ""
+echo "╔══════════════════════════════════════╗"
+echo "║         PRE-COMMIT CHECKS            ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+
+echo "  ▶ Checking branch name..."
+if node scripts/validate-branch-name.mjs; then
+  echo "  ✔ Branch name — passed"
+else
+  echo "  ✘ Branch name — failed"
+  echo ""
+  exit 1
+fi
+
+echo ""
