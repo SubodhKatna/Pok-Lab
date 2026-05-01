@@ -20,14 +20,21 @@ export interface StatsFeedbackRow {
 export interface AttributesFeedbackRow {
   mode: 'attributes';
   guessedPokemon: PokemonSummary;
+  // values shown in the cell
+  guessedValues: {
+    type1: string | null;
+    type2: string | null;
+    generation: number;
+    color: string;
+    eggGroup: string;
+    evolutionStage: number;
+  };
   type1: AttributeFeedback;
   type2: AttributeFeedback;
   generation: AttributeFeedback;
   color: AttributeFeedback;
   eggGroup: AttributeFeedback;
   evolutionStage: AttributeFeedback;
-  height: AttributeFeedback;
-  weight: AttributeFeedback;
 }
 
 export type FeedbackRow = StatsFeedbackRow | AttributesFeedbackRow;
@@ -46,6 +53,8 @@ export interface WordleGameState {
   status: 'idle' | 'playing' | 'won' | 'lost';
   generationFilter: number[];
   sessionStats: WordleSessionStats;
+  hint1Used: boolean; // show mystery Pokémon attribute values
+  hint2Used: boolean; // show one fact (description)
 }
 
 // --- Who's That Pokémon ---

@@ -6,6 +6,21 @@ export interface PokeAPIError {
   message: string;
 }
 
+/** Raw shape returned by /pokemon-species/:nameOrId */
+export interface RawSpecies {
+  id: number;
+  name: string;
+  color: { name: string };
+  egg_groups: Array<{ name: string }>;
+  generation: { name: string }; // e.g. "generation-i"
+  flavor_text_entries: Array<{
+    flavor_text: string;
+    language: { name: string };
+    version: { name: string };
+  }>;
+  evolves_from_species: { name: string; url: string } | null;
+}
+
 /** Raw shape returned by /pokemon/:nameOrId */
 export interface RawPokemon {
   id: number;
@@ -65,6 +80,14 @@ async function apiFetch<T>(url: string): Promise<T> {
  */
 export async function fetchPokemon(nameOrId: string | number): Promise<RawPokemon> {
   return apiFetch<RawPokemon>(`${BASE}/pokemon/${nameOrId}`);
+}
+
+/**
+ * Fetch species data (generation, color, egg groups, flavor text, evolution chain).
+ * Throws a `PokeAPIError` on non-2xx responses.
+ */
+export async function fetchPokemonSpecies(nameOrId: string | number): Promise<RawSpecies> {
+  return apiFetch<RawSpecies>(`${BASE}/pokemon-species/${nameOrId}`);
 }
 
 /**
