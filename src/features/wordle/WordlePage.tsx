@@ -108,18 +108,18 @@ export function WordlePage() {
               </div>
 
               {/* Hint 1 content */}
-              {hint1Used && (
+              {hint1Used && mysteryPokemon && (
                 <HintPanel1 pokemon={mysteryPokemon} />
               )}
 
               {/* Hint 2 content */}
-              {hint2Used && mysteryPokemon.description && (
+              {hint2Used && mysteryPokemon?.description && (
                 <div className="w-full rounded-lg border border-yellow-800/50 bg-yellow-950/30 px-4 py-3 text-sm text-yellow-200">
                   <span className="mr-2 text-yellow-500 font-semibold">Hint 2:</span>
                   {mysteryPokemon.description}
                 </div>
               )}
-              {hint2Used && !mysteryPokemon.description && (
+              {hint2Used && mysteryPokemon && !mysteryPokemon.description && (
                 <div className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-400">
                   No Pokédex entry available for this Pokémon.
                 </div>
