@@ -63,7 +63,7 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
   }
 
   return (
-    <div ref={containerRef} className="relative w-72">
+    <div ref={containerRef} className="relative w-96">
       <input
         type="text"
         value={query}
@@ -75,11 +75,11 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
         placeholder="Type the Pokémon name…"
         disabled={disabled || isSubmitting}
         autoComplete="off"
-        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-sky-600 disabled:opacity-50"
+        className="w-full rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-4 py-3 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400/30 disabled:opacity-50 transition-all"
       />
 
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
+        <ul className="absolute z-50 mt-1 w-full rounded-xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl shadow-2xl overflow-hidden">
           {filtered.map((pokemon) => (
             <li key={pokemon.id}>
               <button
@@ -88,7 +88,7 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
                   e.preventDefault() // prevent input blur before click fires
                   void handleSelect(pokemon)
                 }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm capitalize text-zinc-200 hover:bg-zinc-800 transition-colors"
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm capitalize text-zinc-200 hover:bg-white/10 transition-colors"
               >
                 <img
                   src={pokemon.sprite}
