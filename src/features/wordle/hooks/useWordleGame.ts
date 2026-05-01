@@ -1,7 +1,7 @@
 import { useReducer, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePokemonList } from '@/shared/services/hooks/usePokemonList';
-import { fetchPokemon } from '@/shared/services/pokeapi';
+import { buildPokemonDetail } from '@/shared/services/buildPokemonDetail';
 import { computeStatFeedback, computeAttributeFeedback } from '../logic';
 import type { PokemonDetail, PokemonSummary } from '@/shared/types/pokemon';
 import type {
@@ -11,9 +11,6 @@ import type {
   WordleSessionStats,
 } from '@/shared/types/game-state';
 
-// ---------------------------------------------------------------------------
-// Generation ID ranges (National Pokédex IDs, inclusive)
-// ---------------------------------------------------------------------------
 const GENERATION_RANGES: Record<number, [number, number]> = {
   1: [1, 151],
   2: [152, 251],
@@ -25,21 +22,18 @@ const GENERATION_RANGES: Record<number, [number, number]> = {
   8: [810, 905],
   9: [906, 1025],
 };
-
-// ---------------------------------------------------------------------------
-// Reducer actions
-// ---------------------------------------------------------------------------
 type Action =
   | {
       type: 'START_GAME';
       payload: { mode: WordleMode; generationFilter: number[]; mysteryPokemon: PokemonDetail };
     }
   | { type: 'SUBMIT_GUESS'; payload: { guessed: PokemonDetail } }
-  | { type: 'RESET_GAME' };
+  | { type: 'RESET_GAME' }
+  | { type: 'USE_HINT1' }
+  | { type: 'USE_HINT2' }
+  | { type: 'GIVE_UP' };
 
-// ---------------------------------------------------------------------------
-// Initial state
-// ---------------------------------------------------------------------------
+
 const initialSessionStats: WordleSessionStats = {
   gamesPlayed: 0,
   wins: 0,
@@ -48,17 +42,16 @@ const initialSessionStats: WordleSessionStats = {
 };
 
 const initialState: WordleGameState = {
-  mode: 'stats',
+  mode: 'attributes',
   mysteryPokemon: null,
   guesses: [],
   status: 'idle',
   generationFilter: [],
   sessionStats: initialSessionStats,
+  hint1Used: false,
+  hint2Used: false,
 };
 
-// ---------------------------------------------------------------------------
-// Reducer
-// ---------------------------------------------------------------------------
 function wordleReducer(state: WordleGameState, action: Action): WordleGameState {
   switch (action.type) {
     case 'START_GAME': {
@@ -70,6 +63,8 @@ function wordleReducer(state: WordleGameState, action: Action): WordleGameState 
         mysteryPokemon,
         guesses: [],
         status: 'playing',
+        hint1Used: false,
+        hint2Used: false,
       };
     }
 
@@ -105,7 +100,6 @@ function wordleReducer(state: WordleGameState, action: Action): WordleGameState 
         };
       }
 
-      // No max guess limit — game continues until correct
       return {
         ...state,
         guesses: newGuesses,
@@ -119,6 +113,27 @@ function wordleReducer(state: WordleGameState, action: Action): WordleGameState 
         mysteryPokemon: null,
         guesses: [],
         status: 'idle',
+        hint1Used: false,
+        hint2Used: false,
+      };
+    }
+
+    case 'USE_HINT1':
+      return { ...state, hint1Used: true };
+
+    case 'USE_HINT2':
+      return { ...state, hint2Used: true };
+
+    case 'GIVE_UP': {
+      if (state.status !== 'playing') return state;
+      return {
+        ...state,
+        status: 'lost',
+        sessionStats: {
+          ...state.sessionStats,
+          gamesPlayed: state.sessionStats.gamesPlayed + 1,
+          currentStreak: 0,
+        },
       };
     }
 
@@ -126,10 +141,6 @@ function wordleReducer(state: WordleGameState, action: Action): WordleGameState 
       return state;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Hook return type
-// ---------------------------------------------------------------------------
 export interface UseWordleGameReturn {
   state: WordleGameState;
   pokemonList: PokemonSummary[];
@@ -138,21 +149,16 @@ export interface UseWordleGameReturn {
   startGame: (mode: WordleMode, generationFilter?: number[]) => Promise<void>;
   submitGuess: (pokemon: PokemonDetail) => void;
   resetGame: () => void;
+  useHint1: () => void;
+  useHint2: () => void;
+  giveUp: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 export function useWordleGame(): UseWordleGameReturn {
   const [state, dispatch] = useReducer(wordleReducer, initialState);
   const queryClient = useQueryClient();
   const { data: pokemonList = [], isLoading: isListLoading, error: listError } = usePokemonList();
 
-  /**
-   * Filter the Pokémon list by generation, then pick a random entry.
-   * If no generation filter is provided (or the array is empty), all Pokémon
-   * are eligible.
-   */
   const pickRandomPokemon = useCallback(
     (generationFilter: number[]): PokemonSummary | null => {
       if (pokemonList.length === 0) return null;
@@ -177,84 +183,22 @@ export function useWordleGame(): UseWordleGameReturn {
     [pokemonList],
   );
 
-  /**
-   * Fetch a PokemonDetail, using React Query's cache when available.
-   * Falls back to a direct fetch and stores the result in the cache.
-   */
+
   const fetchPokemonDetail = useCallback(
     async (nameOrId: string | number): Promise<PokemonDetail> => {
-      // Try to get from cache first
       const cached = queryClient.getQueryData<PokemonDetail>(['pokemon-detail', nameOrId]);
       if (cached) return cached;
 
-      // Fetch via React Query's fetchQuery so the result is cached
       return queryClient.fetchQuery<PokemonDetail>({
         queryKey: ['pokemon-detail', nameOrId],
-        queryFn: async () => {
-          const raw = await fetchPokemon(nameOrId);
-
-          const sprite =
-            raw.sprites.other['official-artwork'].front_default ??
-            `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${raw.id}.png`;
-
-          // Map raw stats array to BaseStats
-          const statsMap: Record<string, number> = {};
-          for (const s of raw.stats) {
-            statsMap[s.stat.name] = s.base_stat;
-          }
-
-          // Map raw types to PokemonType[]
-          const types = raw.types
-            .sort((a, b) => a.slot - b.slot)
-            .map((t) => t.type.name) as PokemonDetail['types'];
-
-          // Map abilities
-          const abilities = raw.abilities.map((a) => a.ability.name);
-
-          // NOTE: generation, color, eggGroups, evolutionStage, description,
-          // moves, and evolutionChain require additional PokeAPI endpoints
-          // (species, move details, evolution chain) that are not yet implemented
-          // (see task 20). We provide sensible defaults here so the hook is
-          // functional for the Wordle game, which only uses stats and attributes
-          // that are available from the /pokemon endpoint.
-          const detail: PokemonDetail = {
-            id: raw.id,
-            name: raw.name,
-            sprite,
-            types,
-            stats: {
-              hp: statsMap['hp'] ?? 0,
-              attack: statsMap['attack'] ?? 0,
-              defense: statsMap['defense'] ?? 0,
-              spAtk: statsMap['special-attack'] ?? 0,
-              spDef: statsMap['special-defense'] ?? 0,
-              speed: statsMap['speed'] ?? 0,
-            },
-            abilities,
-            height: raw.height,
-            weight: raw.weight,
-            // Fields requiring species/evolution endpoints — defaults until task 20
-            generation: 0,
-            color: '',
-            eggGroups: [],
-            evolutionStage: 1,
-            description: '',
-            moves: [],
-            evolutionChain: [],
-          };
-
-          return detail;
-        },
+        queryFn: () => buildPokemonDetail(nameOrId),
         staleTime: Infinity,
       });
     },
     [queryClient],
   );
 
-  /**
-   * Start a new game: pick a random mystery Pokémon (filtered by generation),
-   * fetch its full detail, and transition to 'playing'.
-   */
+
   const startGame = useCallback(
     async (mode: WordleMode, generationFilter: number[] = []): Promise<void> => {
       const summary = pickRandomPokemon(generationFilter);
@@ -270,19 +214,24 @@ export function useWordleGame(): UseWordleGameReturn {
     [pickRandomPokemon, fetchPokemonDetail],
   );
 
-  /**
-   * Submit a guess. The caller must provide a fully-resolved PokemonDetail.
-   * Computes feedback and checks for win condition.
-   */
   const submitGuess = useCallback((pokemon: PokemonDetail): void => {
     dispatch({ type: 'SUBMIT_GUESS', payload: { guessed: pokemon } });
   }, []);
 
-  /**
-   * Reset the current game back to idle without clearing session stats.
-   */
   const resetGame = useCallback((): void => {
     dispatch({ type: 'RESET_GAME' });
+  }, []);
+
+  const useHint1 = useCallback((): void => {
+    dispatch({ type: 'USE_HINT1' });
+  }, []);
+
+  const useHint2 = useCallback((): void => {
+    dispatch({ type: 'USE_HINT2' });
+  }, []);
+
+  const giveUp = useCallback((): void => {
+    dispatch({ type: 'GIVE_UP' });
   }, []);
 
   return {
@@ -293,5 +242,8 @@ export function useWordleGame(): UseWordleGameReturn {
     startGame,
     submitGuess,
     resetGame,
+    useHint1,
+    useHint2,
+    giveUp,
   };
 }
