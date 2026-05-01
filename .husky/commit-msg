@@ -1,5 +1,19 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/h"
 
-node scripts/validate-commit-msg.mjs "$1"
+echo ""
+echo "╔══════════════════════════════════════╗"
+echo "║        COMMIT MESSAGE CHECK          ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
 
+echo "  ▶ Validating commit message..."
+if node scripts/validate-commit-msg.mjs "$1"; then
+  echo "  ✔ Commit message — passed"
+else
+  echo "  ✘ Commit message — failed"
+  echo ""
+  exit 1
+fi
+
+echo ""

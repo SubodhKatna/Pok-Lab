@@ -1,9 +1,51 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/h"
 
-node scripts/validate-branch-name.mjs
+echo ""
+echo "╔══════════════════════════════════════╗"
+echo "║          PRE-PUSH CHECKS             ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
 
-npm run lint
-npm run typecheck
-npm run build
+echo "  ▶ Checking branch name..."
+if node scripts/validate-branch-name.mjs; then
+  echo "  ✔ Branch name — passed"
+else
+  echo "  ✘ Branch name — failed"
+  echo ""
+  exit 1
+fi
 
+echo ""
+echo "  ▶ Running lint..."
+if npm run lint --silent; then
+  echo "  ✔ Lint — passed"
+else
+  echo "  ✘ Lint — failed"
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "  ▶ Running typecheck..."
+if npm run typecheck --silent; then
+  echo "  ✔ Typecheck — passed"
+else
+  echo "  ✘ Typecheck — failed"
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "  ▶ Running build..."
+if npm run build --silent; then
+  echo "  ✔ Build — passed"
+else
+  echo "  ✘ Build — failed"
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "  ✔ All checks passed. Pushing..."
+echo ""
