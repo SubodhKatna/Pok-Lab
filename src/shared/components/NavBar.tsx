@@ -31,7 +31,7 @@ export function NavBar()  {
     <nav className="bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between">
       {/* Logo */}
       <NavLink
-        to={GAME_REGISTRY[0].path}
+        to="/"
         className="flex items-center gap-2 text-zinc-100 font-semibold text-base tracking-tight shrink-0 hover:text-white transition-colors"
       >
         <img src="/favicon.svg" alt="PokéLab logo" className="w-7 h-7" />
