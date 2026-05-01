@@ -17,7 +17,7 @@ export function ModeSelector({ value, onChange, disabled = false }: ModeSelector
         Game Mode
       </span>
       <div
-        className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1 gap-1"
+        className="flex rounded-xl border border-white/10 bg-white/5 backdrop-blur-md p-1 gap-1"
         role="group"
         aria-label="Game mode selector"
       >
@@ -31,10 +31,10 @@ export function ModeSelector({ value, onChange, disabled = false }: ModeSelector
               disabled={disabled}
               aria-pressed={isActive}
               className={[
-                'rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors',
+                'rounded-lg px-5 py-2 text-sm font-medium capitalize transition-all',
                 isActive
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-100',
+                  ? 'bg-sky-500/25 border border-sky-400/40 text-sky-200 shadow-[0_0_12px_rgba(14,165,233,0.3)]'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-transparent',
                 disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
               ].join(' ')}
             >
