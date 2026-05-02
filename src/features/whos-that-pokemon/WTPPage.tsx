@@ -8,7 +8,6 @@ export function WTPPage() {
   const { state, isListLoading, startRound, submitGuess, nextRound } = useWTPGame()
   const { mysteryPokemon, guessesRemaining, status, sessionScore, roundCount } = state
 
-  // Start the first round once the Pokémon list is loaded
   useEffect(() => {
     if (!isListLoading && mysteryPokemon === null) {
       void startRound()
@@ -16,123 +15,148 @@ export function WTPPage() {
   }, [isListLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isRevealed = status === 'won' || status === 'lost'
-  const roundOver = isRevealed
-
-  const handleGuess = (pokemon: PokemonSummary) => {
-    submitGuess(pokemon)
-  }
-
-  const handleNext = () => {
-    void nextRound()
-  }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_#0f172a_0%,_#09090b_60%)] px-4 py-10">
+    <div className="min-h-screen bg-zinc-950 px-4 py-12">
       {/* Ambient blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10" aria-hidden="true">
-        <div className="absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-violet-600/10 blur-3xl" />
-        <div className="absolute top-1/2 right-1/4 h-80 w-80 rounded-full bg-sky-600/8 blur-3xl" />
+        <div className="absolute -top-40 left-1/3 h-[500px] w-[500px] rounded-full bg-violet-700/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-sky-600/8 blur-[100px]" />
       </div>
 
-      <div className="mx-auto max-w-2xl flex flex-col items-center gap-8">
+      <div className="mx-auto max-w-xl flex flex-col items-center gap-8">
 
-        {/* Title */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <h1 className="text-4xl font-black tracking-tight text-white">
             Who's That Pokémon?
           </h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Identify the Pokémon from its silhouette.
-          </p>
+          <p className="text-sm text-zinc-500">Identify the Pokémon from its silhouette</p>
         </div>
 
-        {/* Session stats bar */}
-        <div className="flex items-center gap-6 rounded-2xl border border-white/8 bg-white/5 backdrop-blur-md px-6 py-3">
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold tabular-nums text-sky-300">{sessionScore}</span>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Score</span>
-          </div>
-          <div className="h-8 w-px bg-white/10" />
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold tabular-nums text-zinc-100">{roundCount}</span>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Rounds</span>
-          </div>
+        {/* Stats bar */}
+        <div className="flex items-stretch rounded-2xl overflow-hidden border border-white/8 bg-white/4 backdrop-blur-md divide-x divide-white/8">
+          <StatCell label="Score" value={sessionScore} accent="text-yellow-400" glow="rgba(250,204,21,0.4)" />
+          <StatCell label="Round" value={roundCount} accent="text-zinc-100" />
+          <StatCell label="Correct" value={`${sessionScore}/${Math.max(roundCount - 1, 0)}`} accent="text-emerald-400" />
         </div>
 
-        {/* Main game card */}
-        <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 p-8 flex flex-col items-center gap-6">
+        {/* Game card */}
+        <div className="w-full rounded-3xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-sm overflow-visible">
+          {/* Card inner glow top edge */}
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-t-3xl" />
 
-          {/* Loading state */}
-          {isListLoading || mysteryPokemon === null ? (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <div className="h-56 w-56 rounded-2xl bg-zinc-800 animate-pulse" />
-              <p className="text-sm text-zinc-500">Loading…</p>
-            </div>
-          ) : (
-            <>
-              {/* Silhouette / revealed image */}
-              <SilhouetteImage
-                src={mysteryPokemon.sprite}
-                alt={mysteryPokemon.name}
-                revealed={isRevealed}
-              />
-
-              {/* Result banner */}
-              {isRevealed && (
-                <ResultBanner
-                  status={status as 'won' | 'lost'}
-                  pokemonName={mysteryPokemon.name}
+          <div className="px-8 pt-6 pb-10 flex flex-col items-center gap-6">
+            {isListLoading || mysteryPokemon === null ? (
+              <LoadingSkeleton />
+            ) : (
+              <>
+                <SilhouetteImage
+                  src={mysteryPokemon.sprite}
+                  alt={mysteryPokemon.name}
+                  revealed={isRevealed}
                 />
-              )}
 
-              {/* Guess panel */}
-              <GuessPanel
-                guessesRemaining={guessesRemaining}
-                onGuess={handleGuess}
-                onNext={handleNext}
-                roundOver={roundOver}
-                disabled={isListLoading}
-              />
-            </>
-          )}
+                {isRevealed && (
+                  <ResultBanner
+                    status={status as 'won' | 'lost'}
+                    pokemonName={mysteryPokemon.name}
+                  />
+                )}
+
+                <GuessPanel
+                  guessesRemaining={guessesRemaining}
+                  onGuess={(p: PokemonSummary) => submitGuess(p)}
+                  onNext={() => void nextRound()}
+                  roundOver={isRevealed}
+                  disabled={isListLoading}
+                />
+              </>
+            )}
+          </div>
+
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-white/5 to-transparent" />
         </div>
       </div>
     </div>
   )
 }
 
-// ── Result Banner ─────────────────────────────────────────────────────────────
+// ── Stat Cell ─────────────────────────────────────────────────────────────────
 
-interface ResultBannerProps {
-  status: 'won' | 'lost'
-  pokemonName: string
+function StatCell({
+  label,
+  value,
+  accent = 'text-zinc-100',
+  glow,
+}: {
+  label: string
+  value: string | number
+  accent?: string
+  glow?: string
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1 px-10 py-5">
+      <span
+        className={['text-4xl font-black tabular-nums leading-none', accent].join(' ')}
+        style={glow ? { textShadow: `0 0 20px ${glow}` } : undefined}
+      >
+        {value}
+      </span>
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mt-0.5">{label}</span>
+    </div>
+  )
 }
 
-function ResultBanner({ status, pokemonName }: ResultBannerProps) {
+// ── Result Banner ─────────────────────────────────────────────────────────────
+
+function ResultBanner({ status, pokemonName }: { status: 'won' | 'lost'; pokemonName: string }) {
   const isWon = status === 'won'
 
   return (
     <div
       className={[
-        'w-full rounded-xl border px-4 py-3 text-center',
+        'w-full rounded-2xl border px-6 py-5 text-center',
+        'animate-in fade-in slide-in-from-bottom-3 duration-500',
         isWon
-          ? 'border-green-400/20 bg-green-400/10'
-          : 'border-red-400/20 bg-red-400/10',
+          ? 'border-emerald-500/25 bg-gradient-to-b from-emerald-500/15 to-emerald-500/5'
+          : 'border-red-500/25 bg-gradient-to-b from-red-500/15 to-red-500/5',
       ].join(' ')}
+      style={{
+        boxShadow: isWon
+          ? '0 0 32px rgba(52,211,153,0.12), inset 0 1px 0 rgba(52,211,153,0.15)'
+          : '0 0 32px rgba(248,113,113,0.12), inset 0 1px 0 rgba(248,113,113,0.15)',
+      }}
       role="status"
       aria-live="polite"
     >
       {isWon ? (
-        <p className="text-base font-semibold text-green-300">
-          🎉 Correct! It's{' '}
-          <span className="capitalize font-bold text-green-200">{pokemonName}</span>!
-        </p>
+        <>
+          <p className="text-2xl font-black text-emerald-300">🎉 Correct!</p>
+          <p className="mt-1 text-sm text-emerald-400/70">
+            It's <span className="capitalize font-bold text-emerald-200">{pokemonName}</span>!
+          </p>
+        </>
       ) : (
-        <p className="text-base font-semibold text-red-300">
-          😔 It was{' '}
-          <span className="capitalize font-bold text-red-200">{pokemonName}</span>. Better luck next time!
-        </p>
+        <>
+          <p className="text-2xl font-black text-red-300">😔 Not quite!</p>
+          <p className="mt-1 text-sm text-red-400/70">
+            It was <span className="capitalize font-bold text-red-200">{pokemonName}</span>
+          </p>
+        </>
       )}
+    </div>
+  )
+}
+
+// ── Loading Skeleton ──────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex flex-col items-center gap-6 py-4">
+      <div className="h-64 w-64 rounded-full bg-zinc-800/60 animate-pulse" />
+      <div className="h-4 w-32 rounded-full bg-zinc-800 animate-pulse" />
+      <div className="h-12 w-72 rounded-2xl bg-zinc-800/60 animate-pulse" />
     </div>
   )
 }

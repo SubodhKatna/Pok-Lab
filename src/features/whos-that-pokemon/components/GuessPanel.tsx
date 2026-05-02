@@ -3,24 +3,13 @@ import { usePokemonList } from '@/shared/services/hooks/usePokemonList'
 import type { PokemonSummary } from '@/shared/types/pokemon'
 
 interface GuessPanelProps {
-  /** Number of incorrect guesses still allowed. */
   guessesRemaining: number
-  /** Called when the user selects a Pokémon from the autocomplete. */
   onGuess: (pokemon: PokemonSummary) => void
-  /** Called when the user clicks "Next Round". */
   onNext: () => void
-  /** Whether the round is over (won or lost). Shows "Next" button instead of input. */
   roundOver: boolean
-  /** Disable the input (e.g. while loading). */
   disabled?: boolean
 }
 
-/**
- * Guess panel for Who's That Pokémon.
- *
- * - While playing: shows a searchable autocomplete input + guesses-remaining indicator.
- * - When round is over: shows a "Next Round" button.
- */
 export function GuessPanel({
   guessesRemaining,
   onGuess,
@@ -40,7 +29,6 @@ export function GuessPanel({
           .slice(0, 8)
       : []
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -62,67 +50,88 @@ export function GuessPanel({
       <button
         type="button"
         onClick={onNext}
-        className="rounded-xl bg-sky-500/20 border border-sky-400/30 backdrop-blur-md px-10 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-500/30 hover:border-sky-400/50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+        className="group relative overflow-hidden rounded-2xl px-12 py-3.5 text-sm font-bold text-white transition-all duration-300 active:scale-95 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+        style={{
+          background: 'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)',
+          boxShadow: '0 0 24px rgba(14,165,233,0.35)',
+        }}
       >
-        Next Round →
+        <span className="relative z-10 flex items-center gap-2">
+          Next Round
+          <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+        </span>
+        {/* Shine sweep */}
+        <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
       </button>
     )
   }
 
+  // Dot color per remaining count
+  const dotColor = (i: number) => {
+    if (i >= guessesRemaining) return 'bg-zinc-700 border-zinc-600'
+    if (guessesRemaining === 3) return 'bg-sky-400 border-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.7)]'
+    if (guessesRemaining === 2) return 'bg-yellow-400 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.7)]'
+    return 'bg-red-400 border-red-400 shadow-[0_0_10px_rgba(248,113,113,0.7)]'
+  }
+
+  const countColor =
+    guessesRemaining === 3
+      ? 'text-sky-300'
+      : guessesRemaining === 2
+        ? 'text-yellow-300'
+        : 'text-red-400'
+
   return (
-    <div className="flex flex-col items-center gap-4">
-      {/* Guesses remaining indicator */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-          Guesses remaining:
+    <div className="flex flex-col items-center gap-5 w-full">
+      {/* Guesses remaining */}
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+          Guesses remaining
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex items-center gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <span
               key={i}
               className={[
-                'h-3 w-3 rounded-full border',
-                i < guessesRemaining
-                  ? 'bg-sky-400 border-sky-400'
-                  : 'bg-transparent border-zinc-600',
+                'h-4 w-4 rounded-full border-2 transition-all duration-400',
+                dotColor(i),
               ].join(' ')}
               aria-hidden="true"
             />
           ))}
+          <span className={['text-base font-extrabold tabular-nums transition-colors duration-300', countColor].join(' ')}>
+            {guessesRemaining}
+          </span>
         </div>
-        <span className="text-sm font-semibold tabular-nums text-zinc-300">
-          {guessesRemaining} / 3
-        </span>
       </div>
 
-      {/* Autocomplete input */}
-      <div ref={containerRef} className="relative w-96">
+      {/* Autocomplete */}
+      <div ref={containerRef} className="relative w-full max-w-sm">
         <input
           type="text"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setOpen(true)
-          }}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => query.trim().length >= 1 && setOpen(true)}
-          placeholder="Who's that Pokémon?"
+          placeholder="Type a Pokémon name…"
           disabled={disabled}
           autoComplete="off"
-          className="w-full rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-4 py-3 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400/30 disabled:opacity-50 transition-all"
+          className="w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-5 py-3.5 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-400/30 disabled:opacity-40 transition-all"
         />
 
         {open && filtered.length > 0 && (
-          <ul className="absolute z-50 mt-1 w-full rounded-xl border border-white/10 bg-zinc-900/90 backdrop-blur-xl shadow-2xl overflow-hidden">
-            {filtered.map((pokemon) => (
+          <ul className="absolute z-50 mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900/95 backdrop-blur-xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+            {filtered.map((pokemon, idx) => (
               <li key={pokemon.id}>
                 <button
                   type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    handleSelect(pokemon)
-                  }}
-                  className="flex w-full items-center px-3 py-2.5 text-sm capitalize text-zinc-200 hover:bg-white/10 transition-colors"
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(pokemon) }}
+                  className={[
+                    'flex w-full items-center gap-3 px-4 py-2.5 text-sm capitalize text-zinc-200 hover:bg-white/10 transition-colors',
+                    idx === 0 ? 'pt-3' : '',
+                    idx === filtered.length - 1 ? 'pb-3' : '',
+                  ].join(' ')}
                 >
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-400/60 flex-shrink-0" />
                   {pokemon.name}
                 </button>
               </li>

@@ -1,26 +1,36 @@
 interface SilhouetteImageProps {
-  /** Official artwork URL for the mystery Pokémon. */
   src: string
-  /** Alt text for the image (use Pokémon name when revealed, generic when hidden). */
   alt: string
-  /** When true, the full-color image is shown. When false, brightness(0) silhouette. */
   revealed: boolean
 }
 
 /**
- * Displays a Pokémon sprite as a black silhouette until `revealed` is true.
- *
- * Uses CSS `filter: brightness(0)` for the silhouette effect — no extra assets needed.
- * The transition is instant (polish pass will add animation).
+ * Pokémon silhouette with a dramatic spotlight backdrop.
+ * Smooth 800ms brightness + scale transition on reveal.
  */
 export function SilhouetteImage({ src, alt, revealed }: SilhouetteImageProps) {
   return (
-    <div className="flex items-center justify-center">
+    <div className="relative flex items-center justify-center w-80 h-80">
+      {/* Spotlight glow */}
+      <div
+        className={[
+          'absolute inset-8 rounded-full blur-2xl transition-all duration-700',
+          revealed ? 'bg-yellow-400/30 scale-125' : 'bg-violet-500/15 scale-100',
+        ].join(' ')}
+        aria-hidden="true"
+      />
+
       <img
         src={src}
         alt={revealed ? alt : 'Mystery Pokémon silhouette'}
-        className="h-56 w-56 object-contain drop-shadow-2xl select-none"
-        style={revealed ? undefined : { filter: 'brightness(0)' }}
+        className="relative z-10 h-72 w-72 object-contain select-none"
+        style={{
+          filter: revealed
+            ? 'brightness(1) drop-shadow(0 0 32px rgba(250,204,21,0.4))'
+            : 'brightness(0)',
+          transform: revealed ? 'scale(1.08)' : 'scale(1)',
+          transition: 'filter 800ms ease-in-out, transform 800ms ease-in-out',
+        }}
         draggable={false}
       />
     </div>
