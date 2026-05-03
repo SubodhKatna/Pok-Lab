@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from 'react'
+import { useReducer, useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePokemonList } from '@/shared/services/hooks/usePokemonList'
 import { buildPokemonDetail } from '@/shared/services/buildPokemonDetail'
@@ -82,6 +82,7 @@ function partialImageReducer(
 
 export interface UsePartialImageGameReturn {
   state: PartialImageGameState
+  cropOrigin: string
   pokemonList: PokemonSummary[]
   isListLoading: boolean
   listError: Error | null
@@ -92,6 +93,7 @@ export interface UsePartialImageGameReturn {
 
 export function usePartialImageGame(): UsePartialImageGameReturn {
   const [state, dispatch] = useReducer(partialImageReducer, initialState)
+  const [cropOrigin, setCropOrigin] = useState('50% 50%')
   const queryClient = useQueryClient()
   const {
     data: pokemonList = [],
@@ -123,6 +125,11 @@ export function usePartialImageGame(): UsePartialImageGameReturn {
     const summary = pickRandomPokemon()
     if (!summary) return
 
+    // Generate a new random crop origin for this round (biased 20–80% to avoid edges)
+    const x = 20 + Math.random() * 60
+    const y = 20 + Math.random() * 60
+    setCropOrigin(`${x.toFixed(1)}% ${y.toFixed(1)}%`)
+
     const mysteryPokemon = await fetchPokemonDetail(summary.id)
     dispatch({ type: 'START_ROUND', payload: { mysteryPokemon } })
   }, [pickRandomPokemon, fetchPokemonDetail])
@@ -138,6 +145,7 @@ export function usePartialImageGame(): UsePartialImageGameReturn {
 
   return {
     state,
+    cropOrigin,
     pokemonList,
     isListLoading,
     listError: listError as Error | null,

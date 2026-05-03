@@ -5,7 +5,7 @@ import { GuessPanel } from './components/GuessPanel'
 import type { PokemonSummary } from '@/shared/types/pokemon'
 
 export function PartialImagePage() {
-  const { state, isListLoading, startRound, submitGuess, nextRound } = usePartialImageGame()
+  const { state, cropOrigin, isListLoading, startRound, submitGuess, nextRound } = usePartialImageGame()
   const { mysteryPokemon, revealStep, status, sessionScore, roundCount } = state
 
   useEffect(() => {
@@ -59,6 +59,7 @@ export function PartialImagePage() {
                   src={mysteryPokemon.sprite}
                   alt={mysteryPokemon.name}
                   revealStep={revealStep}
+                  cropOrigin={cropOrigin}
                   revealed={isRevealed}
                 />
 

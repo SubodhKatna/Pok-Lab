@@ -38,7 +38,7 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
       },
       { signal: controller.signal },
     )
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   const scrollActiveIntoView = (index: number) => {
     if (index < 0 || !listRef.current) return

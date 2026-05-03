@@ -1,47 +1,33 @@
-import { useMemo } from 'react'
-
 /**
- * CroppedImage — shows a random zoomed-in crop of a Pokémon sprite and
- * progressively zooms out with each reveal step.
+ * CroppedImage — shows a zoomed-in crop of a Pokémon sprite and progressively
+ * zooms out with each reveal step.
  *
- * Technique: fixed-size viewport container with overflow:hidden.
- * The image is scaled up and positioned at a random origin per round.
- * Each step reduces the scale until step 4 = full image (scale 1).
+ * The crop origin (transform-origin) is passed in as a prop so it can be
+ * generated outside of render (in the hook) — keeping this component pure.
  *
  * Scale steps:
- *   Step 0: 5× zoom  — tiny random crop (~4% of image visible)
- *   Step 1: 3.5× zoom
- *   Step 2: 2.5× zoom
- *   Step 3: 1.6× zoom
- *   Step 4: 1×  zoom — full image
+ *   Step 0: 5×   — tiny random crop (~4% visible)
+ *   Step 1: 3.5×
+ *   Step 2: 2.5×
+ *   Step 3: 1.6×
+ *   Step 4: 1×   — full image
  */
 
 const SCALE_STEPS = [5, 3.5, 2.5, 1.6, 1]
-
-/** Viewport size in px — the "window" the player sees through */
 const VIEWPORT = 220
 
 interface CroppedImageProps {
   src: string
   alt: string
   revealStep: number
+  /** CSS transform-origin string, e.g. "42.3% 61.7%". Generated per round in the hook. */
+  cropOrigin: string
   revealed?: boolean
 }
 
-export function CroppedImage({ src, alt, revealStep, revealed = false }: CroppedImageProps) {
+export function CroppedImage({ src, alt, revealStep, cropOrigin, revealed = false }: CroppedImageProps) {
   const clampedStep = Math.min(Math.max(revealStep, 0), SCALE_STEPS.length - 1)
   const scale = revealed ? 1 : SCALE_STEPS[clampedStep]
-
-  /**
-   * Pick a stable random transform-origin per Pokémon (src changes each round).
-   * Values are percentages (0–100) so the crop point is anywhere on the image.
-   * We bias slightly away from edges (20–80%) so the crop always shows something.
-   */
-  const origin = useMemo(() => {
-    const x = 20 + Math.random() * 60
-    const y = 20 + Math.random() * 60
-    return `${x.toFixed(1)}% ${y.toFixed(1)}%`
-  }, [src]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -52,7 +38,7 @@ export function CroppedImage({ src, alt, revealStep, revealed = false }: Cropped
           : `Mystery Pokémon, reveal step ${clampedStep + 1} of 5`
       }
     >
-      {/* Glow behind the viewport */}
+      {/* Glow */}
       <div
         className="absolute rounded-full blur-3xl opacity-25 bg-sky-400 pointer-events-none"
         style={{ width: VIEWPORT, height: VIEWPORT }}
@@ -71,7 +57,7 @@ export function CroppedImage({ src, alt, revealStep, revealed = false }: Cropped
           className="absolute inset-0 w-full h-full object-contain select-none"
           style={{
             transform: `scale(${scale})`,
-            transformOrigin: origin,
+            transformOrigin: cropOrigin,
             transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         />
