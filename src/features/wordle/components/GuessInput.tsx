@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePokemonList } from '@/shared/services/hooks/usePokemonList'
 import { buildPokemonDetail } from '@/shared/services/buildPokemonDetail'
@@ -26,25 +26,25 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
           .slice(0, 50)
       : []
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  // Close on outside click — no setState inside, just setOpen which is fine
+  const handleContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    ;(containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+    const controller = new AbortController()
+    document.addEventListener(
+      'mousedown',
+      (e) => {
+        if (!node.contains(e.target as Node)) setOpen(false)
+      },
+      { signal: controller.signal },
+    )
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset active index when filtered list changes
-  useEffect(() => { setActiveIndex(-1) }, [filtered.length])
-
-  // Scroll active item into view
-  useEffect(() => {
-    if (activeIndex < 0 || !listRef.current) return
-    const item = listRef.current.children[activeIndex] as HTMLElement | undefined
+  const scrollActiveIntoView = (index: number) => {
+    if (index < 0 || !listRef.current) return
+    const item = listRef.current.children[index] as HTMLElement | undefined
     item?.scrollIntoView({ block: 'nearest' })
-  }, [activeIndex])
+  }
 
   const handleSelect = useCallback(async (pokemon: PokemonSummary) => {
     setQuery('')
@@ -69,10 +69,14 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
     if (!open || filtered.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex(i => Math.min(i + 1, filtered.length - 1))
+      const next = Math.min(activeIndex + 1, filtered.length - 1)
+      setActiveIndex(next)
+      scrollActiveIntoView(next)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex(i => Math.max(i - 1, 0))
+      const prev = Math.max(activeIndex - 1, 0)
+      setActiveIndex(prev)
+      scrollActiveIntoView(prev)
     } else if (e.key === 'Enter' && activeIndex >= 0) {
       e.preventDefault()
       void handleSelect(filtered[activeIndex])
@@ -83,11 +87,11 @@ export function GuessInput({ onSubmit, disabled = false }: GuessInputProps) {
   }
 
   return (
-    <div ref={containerRef} className="relative w-96">
+    <div ref={handleContainerRef} className="relative w-96">
       <input
         type="text"
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIndex(-1) }}
         onFocus={() => query.trim().length >= 1 && setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder="Type the Pokémon name…"
