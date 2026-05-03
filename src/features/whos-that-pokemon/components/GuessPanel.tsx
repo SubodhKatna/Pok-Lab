@@ -41,13 +41,11 @@ export function GuessPanel({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  useEffect(() => { setActiveIndex(-1) }, [filtered.length])
-
-  useEffect(() => {
-    if (activeIndex < 0 || !listRef.current) return
-    const item = listRef.current.children[activeIndex] as HTMLElement | undefined
+  const scrollActiveIntoView = (index: number) => {
+    if (index < 0 || !listRef.current) return
+    const item = listRef.current.children[index] as HTMLElement | undefined
     item?.scrollIntoView({ block: 'nearest' })
-  }, [activeIndex])
+  }
 
   const handleSelect = useCallback((pokemon: PokemonSummary) => {
     setQuery('')
@@ -60,10 +58,14 @@ export function GuessPanel({
     if (!open || filtered.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex(i => Math.min(i + 1, filtered.length - 1))
+      const next = Math.min(activeIndex + 1, filtered.length - 1)
+      setActiveIndex(next)
+      scrollActiveIntoView(next)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex(i => Math.max(i - 1, 0))
+      const prev = Math.max(activeIndex - 1, 0)
+      setActiveIndex(prev)
+      scrollActiveIntoView(prev)
     } else if (e.key === 'Enter' && activeIndex >= 0) {
       e.preventDefault()
       handleSelect(filtered[activeIndex])
@@ -138,7 +140,7 @@ export function GuessPanel({
         <input
           type="text"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIndex(-1) }}
           onFocus={() => query.trim().length >= 1 && setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Type a Pokémon name…"
