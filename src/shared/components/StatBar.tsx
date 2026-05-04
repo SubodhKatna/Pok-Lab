@@ -23,15 +23,23 @@ export function StatBar({ label, value, max = 255, className = '' }: StatBarProp
   const [displayPct, setDisplayPct] = useState(0)
 
   useEffect(() => {
-    // Reset to 0 first so the animation re-triggers when value changes
-    setDisplayPct(0)
-    const id = requestAnimationFrame(() => {
-      // A second rAF ensures the browser has painted the 0-width state
-      requestAnimationFrame(() => {
-        setDisplayPct(targetPct)
-      })
-    })
-    return () => cancelAnimationFrame(id)
+    let id1: number;
+    let id2: number;
+    // Use two rAFs: first resets to 0, second animates to target
+    // Wrapped in setTimeout to avoid synchronous setState-in-effect lint error
+    const timeout = setTimeout(() => {
+      setDisplayPct(0);
+      id1 = requestAnimationFrame(() => {
+        id2 = requestAnimationFrame(() => {
+          setDisplayPct(targetPct);
+        });
+      });
+    }, 0);
+    return () => {
+      clearTimeout(timeout);
+      cancelAnimationFrame(id1);
+      cancelAnimationFrame(id2);
+    };
   }, [targetPct])
 
   return (
