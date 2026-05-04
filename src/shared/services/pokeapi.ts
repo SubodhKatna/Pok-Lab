@@ -19,6 +19,11 @@ export interface RawSpecies {
     version: { name: string };
   }>;
   evolves_from_species: { name: string; url: string } | null;
+  evolution_chain: { url: string };
+  varieties: Array<{
+    is_default: boolean;
+    pokemon: { name: string; url: string };
+  }>;
 }
 
 /** Raw shape returned by /pokemon/:nameOrId */
@@ -48,6 +53,10 @@ export interface RawPokemon {
   weight: number;
   moves: Array<{
     move: { name: string; url: string };
+    version_group_details: Array<{
+      level_learned_at: number;
+      move_learn_method: { name: string };
+    }>;
   }>;
 }
 
@@ -60,6 +69,38 @@ export interface PokemonListEntry {
 interface RawPokemonListResponse {
   count: number;
   results: PokemonListEntry[];
+}
+
+/** Raw shape returned by /move/:nameOrId */
+export interface RawMove {
+  id: number;
+  name: string;
+  type: { name: string };
+  damage_class: { name: string }; // "physical" | "special" | "status"
+  power: number | null;
+  accuracy: number | null;
+  pp: number;
+  effect_entries: Array<{
+    short_effect: string;
+    language: { name: string };
+  }>;
+}
+
+/** A single node in the evolution chain tree */
+export interface RawEvolutionChainLink {
+  species: { name: string; url: string };
+  evolution_details: Array<{
+    trigger: { name: string };
+    min_level: number | null;
+    item: { name: string } | null;
+  }>;
+  evolves_to: RawEvolutionChainLink[];
+}
+
+/** Raw shape returned by /evolution-chain/:id */
+export interface RawEvolutionChain {
+  id: number;
+  chain: RawEvolutionChainLink;
 }
 
 async function apiFetch<T>(url: string): Promise<T> {
@@ -100,4 +141,36 @@ export async function fetchPokemonList(limit = 1025): Promise<PokemonListEntry[]
     `${BASE}/pokemon?limit=${limit}&offset=0`,
   );
   return data.results;
+}
+
+/**
+ * Fetch a single move by name or ID.
+ * Throws a `PokeAPIError` on non-2xx responses.
+ */
+export async function fetchMove(nameOrId: string | number): Promise<RawMove> {
+  return apiFetch<RawMove>(`${BASE}/move/${nameOrId}`);
+}
+
+/**
+ * Fetch an evolution chain by its numeric ID.
+ * Throws a `PokeAPIError` on non-2xx responses.
+ */
+export async function fetchEvolutionChain(id: number): Promise<RawEvolutionChain> {
+  return apiFetch<RawEvolutionChain>(`${BASE}/evolution-chain/${id}`);
+}
+
+/**
+ * Fetch all Pokémon IDs for a given type.
+ * Returns an array of numeric IDs (only base forms, id <= 10000).
+ */
+export async function fetchPokemonIdsByType(typeName: string): Promise<number[]> {
+  const data = await apiFetch<{ pokemon: Array<{ pokemon: { name: string; url: string } }> }>(
+    `${BASE}/type/${typeName}`,
+  );
+  return data.pokemon
+    .map((entry) => {
+      const segments = entry.pokemon.url.replace(/\/$/, '').split('/');
+      return Number(segments[segments.length - 1]);
+    })
+    .filter((id) => id > 0 && id <= 10000);
 }
