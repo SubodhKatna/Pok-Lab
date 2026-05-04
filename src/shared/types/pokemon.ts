@@ -21,7 +21,7 @@ export interface PokemonSummary {
 export interface PokemonDetail extends PokemonSummary {
   types: PokemonType[];
   stats: BaseStats;
-  abilities: string[];
+  abilities: Array<{ name: string; isHidden: boolean }>;
   height: number;   // decimetres
   weight: number;   // hectograms
   generation: number; // 1–9
@@ -40,6 +40,9 @@ export interface MoveEntry {
   power: number | null;
   accuracy: number | null;
   pp: number;
+  learnMethod: string;       // e.g. "level-up", "machine", "egg", "tutor"
+  levelLearnedAt: number;    // 0 if not level-up
+  effect: string;            // short effect description
 }
 
 export interface EvolutionNode {
@@ -47,4 +50,5 @@ export interface EvolutionNode {
   id: number;
   trigger: string; // e.g. "level-up at 16", "use Fire Stone"
   children: EvolutionNode[];
+  variants?: Array<{ name: string; id: number }>; // regional forms / variants
 }
