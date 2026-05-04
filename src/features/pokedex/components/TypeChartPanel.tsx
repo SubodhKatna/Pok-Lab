@@ -1,29 +1,15 @@
 import { TypeBadge } from '@/shared/components/TypeBadge';
-import { computeTypeEffectiveness, ALL_TYPES } from '../logic';
+import { ALL_TYPES } from '../logic';
 import type { PokemonType } from '@/shared/types/pokemon';
 
 const MULT_STYLE: Record<number, { label: string; pill: string; row: string }> = {
-  4:    { label: '4×',  pill: 'bg-red-700 border border-red-500 text-white font-bold',         row: 'bg-red-950/60' },
-  2:    { label: '2×',  pill: 'bg-orange-700 border border-orange-500 text-white font-bold',   row: 'bg-orange-950/40' },
-  1:    { label: '1×',  pill: 'bg-zinc-700 border border-zinc-600 text-zinc-300',              row: '' },
-  0.5:  { label: '½×',  pill: 'bg-sky-700 border border-sky-500 text-white font-bold',         row: 'bg-sky-950/40' },
-  0.25: { label: '¼×',  pill: 'bg-blue-700 border border-blue-500 text-white font-bold',       row: 'bg-blue-950/50' },
-  0:    { label: '0×',  pill: 'bg-zinc-800 border border-zinc-600 text-zinc-400 font-bold',    row: 'bg-zinc-900' },
+  4:    { label: '4×',  pill: 'bg-red-700 border border-red-500 text-white font-bold',       row: 'bg-red-950/60' },
+  2:    { label: '2×',  pill: 'bg-orange-700 border border-orange-500 text-white font-bold', row: 'bg-orange-950/40' },
+  1:    { label: '1×',  pill: 'bg-zinc-700 border border-zinc-600 text-zinc-300',            row: '' },
+  0.5:  { label: '½×',  pill: 'bg-sky-700 border border-sky-500 text-white font-bold',       row: 'bg-sky-950/40' },
+  0.25: { label: '¼×',  pill: 'bg-blue-700 border border-blue-500 text-white font-bold',     row: 'bg-blue-950/50' },
+  0:    { label: '0×',  pill: 'bg-zinc-800 border border-zinc-600 text-zinc-400 font-bold',  row: 'bg-zinc-900' },
 };
-
-export function computeOffense(attackerTypes: PokemonType[]): Record<PokemonType, number> {
-  const result = {} as Record<PokemonType, number>;
-  for (const defType of ALL_TYPES) {
-    let best = 1;
-    for (const atkType of attackerTypes) {
-      const chart = computeTypeEffectiveness([defType]);
-      const mult = chart[atkType] ?? 1;
-      if (mult > best) best = mult;
-    }
-    result[defType] = best;
-  }
-  return result;
-}
 
 export function TypeChartSection({ title, chart }: { title: string; chart: Record<PokemonType, number> }) {
   const order = [4, 2, 0.5, 0.25, 0, 1];

@@ -4,11 +4,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { usePokedex } from './hooks/usePokedex';
 import { PokemonHero, PokemonStats } from './components/PokemonHero';
 import { PokemonInfo } from './components/PokemonInfo';
-import { TypeChartSection, computeOffense } from './components/TypeChartPanel';
+import { TypeChartSection } from './components/TypeChartPanel';
 import { EvolutionChain } from './components/EvolutionChain';
 import { MoveList } from './components/MoveList';
 import { PokedexFilters, PokemonGrid } from './components/PokedexGrid';
-import { computeTypeEffectiveness } from './logic';
+import { computeTypeEffectiveness, computeOffense } from './logic';
 
 export function PokedexPage() {
   const navigate = useNavigate();

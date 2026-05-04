@@ -62,6 +62,23 @@ export function computeTypeEffectiveness(
   return result;
 }
 
+/**
+ * Compute the best offensive multiplier this Pokémon's types deal against each defending type.
+ */
+export function computeOffense(attackerTypes: PokemonType[]): Record<PokemonType, number> {
+  const result = {} as Record<PokemonType, number>;
+  for (const defType of ALL_TYPES) {
+    let best = 1;
+    for (const atkType of attackerTypes) {
+      const chart = computeTypeEffectiveness([defType]);
+      const mult = chart[atkType] ?? 1;
+      if (mult > best) best = mult;
+    }
+    result[defType] = best;
+  }
+  return result;
+}
+
 /** Per-stat highlight info returned by computeStatHighlights. */
 export interface StatHighlight {
   /** The stat key. */
