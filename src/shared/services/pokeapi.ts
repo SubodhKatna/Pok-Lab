@@ -103,6 +103,24 @@ export interface RawEvolutionChain {
   chain: RawEvolutionChainLink;
 }
 
+/** Raw shape returned by /item?limit=N */
+export interface ItemListEntry {
+  name: string;
+  url: string;
+}
+
+/** Raw shape returned by /item/:nameOrId */
+export interface RawItem {
+  id: number;
+  name: string;
+  sprites: { default: string | null };
+  category: { name: string };
+  effect_entries: Array<{
+    short_effect: string;
+    language: { name: string };
+  }>;
+}
+
 async function apiFetch<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -173,4 +191,53 @@ export async function fetchPokemonIdsByType(typeName: string): Promise<number[]>
       return Number(segments[segments.length - 1]);
     })
     .filter((id) => id > 0 && id <= 10000);
+}
+
+/**
+ * Fetch the list of all hold items from PokeAPI.
+ * Uses the "all-held-items" category which covers every item a Pokémon can hold.
+ * Falls back to a broad item fetch filtered by holdable categories if needed.
+ */
+export async function fetchItemList(): Promise<ItemListEntry[]> {
+  // PokeAPI item categories that represent holdable items
+  const HOLD_CATEGORIES = [
+    'held-items',
+    'choice',
+    'effort-training',
+    'bad-held-items',
+    'training',
+    'plates',
+    'species-specific',
+    'type-enhancement',
+    'mega-stones',
+    'memories',
+    'z-crystals',
+    'jewels',
+    'stat-boosts',
+    'in-a-pinch',
+    'other',
+  ];
+
+  const results = await Promise.allSettled(
+    HOLD_CATEGORIES.map((cat) =>
+      apiFetch<{ items: ItemListEntry[] }>(`${BASE}/item-category/${cat}`).then((d) => d.items),
+    ),
+  );
+
+  const seen = new Set<string>();
+  const items: ItemListEntry[] = [];
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      for (const item of r.value) {
+        if (!seen.has(item.name)) {
+          seen.add(item.name);
+          items.push(item);
+        }
+      }
+    }
+  }
+
+  // Sort alphabetically for consistent display
+  items.sort((a, b) => a.name.localeCompare(b.name));
+  return items;
 }
