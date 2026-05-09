@@ -3,16 +3,28 @@ import { useWTPGame } from './hooks/useWTPGame'
 import { SilhouetteImage } from './components/SilhouetteImage'
 import { GuessPanel } from './components/GuessPanel'
 import type { PokemonSummary } from '@/shared/types/pokemon'
+import { useGameScore } from '@/features/auth/useGameScore'
 
 export function WTPPage() {
   const { state, isListLoading, startRound, submitGuess, nextRound } = useWTPGame()
   const { mysteryPokemon, guessesRemaining, status, sessionScore, roundCount } = state
+  const { recordScore } = useGameScore()
 
   useEffect(() => {
     if (!isListLoading && mysteryPokemon === null) {
       void startRound()
     }
   }, [isListLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save score when a round ends (1 = correct, 0 = failed)
+  useEffect(() => {
+    if (status === 'won') {
+      void recordScore('whos-that-pokemon', 1)
+    } else if (status === 'lost') {
+      void recordScore('whos-that-pokemon', 0)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   const isRevealed = status === 'won' || status === 'lost'
 

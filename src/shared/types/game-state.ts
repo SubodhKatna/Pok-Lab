@@ -94,5 +94,4 @@ export interface TeamBuilderState {
   tournamentMode: boolean;
   synergyScore: SynergyBreakdown | null;
   tournamentScore: number | null;
-  suggestions: PokemonSummary[];
 }

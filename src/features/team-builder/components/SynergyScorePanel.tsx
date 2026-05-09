@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { FiChevronDown, FiZap } from 'react-icons/fi';
+import { FiChevronDown } from 'react-icons/fi';
 import type { SynergyBreakdown, TeamMember } from '@/shared/types/game-state';
-import { useAIAnalysis } from '@/shared/services/hooks/useAIAnalysis';
-import type { AIAnalysisSection as AnalysisSection } from '@/shared/services/gemini';
+import { weaknessesOf, offensiveCoverageOf } from '../scoring';
+import type { PokemonType } from '@/shared/types/pokemon';
+import { ALL_TYPES } from '@/features/pokedex/logic';
 
 interface SynergyScorePanelProps {
   synergyScore: SynergyBreakdown | null;
@@ -52,10 +53,59 @@ function scoreTierClasses(score: number): {
   };
 }
 
-/**
- * Displays the synergy score total and its three component breakdowns,
- * a full text analysis, and optionally the tournament score.
- */
+/** Derive plain-text insights from the team's stats — no AI needed. */
+function computeInsights(
+  members: TeamMember[],
+  score: SynergyBreakdown,
+): Array<{ label: string; text: string; sentiment: 'good' | 'warn' | 'bad' | 'neutral' }> {
+  const insights: Array<{ label: string; text: string; sentiment: 'good' | 'warn' | 'bad' | 'neutral' }> = [];
+
+  // ── Coverage ──────────────────────────────────────────────────────────────
+  const allCovered = new Set<PokemonType>();
+  for (const m of members) {
+    for (const t of offensiveCoverageOf(m.pokemon.types)) allCovered.add(t);
+  }
+  const uncovered = ALL_TYPES.filter((t) => !allCovered.has(t));
+  if (uncovered.length === 0) {
+    insights.push({ label: 'Offensive Coverage', text: 'Your team covers all 18 types offensively — excellent spread.', sentiment: 'good' });
+  } else if (uncovered.length <= 3) {
+    insights.push({ label: 'Offensive Coverage', text: `Good coverage. Missing super-effective hits against: ${uncovered.join(', ')}.`, sentiment: 'warn' });
+  } else {
+    insights.push({ label: 'Offensive Coverage', text: `Coverage gaps against ${uncovered.length} types: ${uncovered.slice(0, 5).join(', ')}${uncovered.length > 5 ? '…' : ''}. Consider adding more type variety.`, sentiment: 'bad' });
+  }
+
+  // ── Shared weaknesses ─────────────────────────────────────────────────────
+  const sharedWeak: PokemonType[] = [];
+  for (const t of ALL_TYPES) {
+    if (members.every((m) => weaknessesOf(m.pokemon.types).has(t))) sharedWeak.push(t);
+  }
+  if (sharedWeak.length === 0) {
+    insights.push({ label: 'Shared Weaknesses', text: 'No type threatens every member — solid defensive spread.', sentiment: 'good' });
+  } else if (sharedWeak.length <= 2) {
+    insights.push({ label: 'Shared Weaknesses', text: `All members share a weakness to ${sharedWeak.join(' and ')}. Consider a resist or immunity.`, sentiment: 'warn' });
+  } else {
+    insights.push({ label: 'Shared Weaknesses', text: `${sharedWeak.length} shared weaknesses (${sharedWeak.slice(0, 4).join(', ')}…). The team is fragile against these types.`, sentiment: 'bad' });
+  }
+
+  // ── Role diversity ────────────────────────────────────────────────────────
+  if (score.roleDiversity >= 20) {
+    insights.push({ label: 'Role Diversity', text: 'Good mix of speed tiers and archetypes — the team has varied roles.', sentiment: 'good' });
+  } else if (score.roleDiversity >= 10) {
+    insights.push({ label: 'Role Diversity', text: 'Moderate role variety. Adding a different archetype (wall, support, or fast attacker) would help.', sentiment: 'warn' });
+  } else {
+    insights.push({ label: 'Role Diversity', text: 'Low role diversity — most members fill the same niche. Mix in a wall or support Pokémon.', sentiment: 'bad' });
+  }
+
+  // ── Team size note ────────────────────────────────────────────────────────
+  if (members.length < 6) {
+    insights.push({ label: 'Team Size', text: `${6 - members.length} slot${6 - members.length > 1 ? 's' : ''} remaining. A full team of 6 gives the most flexibility.`, sentiment: 'neutral' });
+  } else {
+    insights.push({ label: 'Team Size', text: 'Full team of 6. Ready to battle!', sentiment: 'good' });
+  }
+
+  return insights;
+}
+
 export function SynergyScorePanel({
   synergyScore,
   tournamentMode,
@@ -64,13 +114,6 @@ export function SynergyScorePanel({
   members,
 }: SynergyScorePanelProps) {
   const [showInfo, setShowInfo] = useState(false);
-
-  const {
-    data: aiData,
-    isLoading: aiLoading,
-    isError: aiError,
-    refetch: retryAnalysis,
-  } = useAIAnalysis(members, synergyScore);
 
   if (memberCount < 2) {
     return (
@@ -87,13 +130,13 @@ export function SynergyScorePanel({
   const { coverageBreadth, sharedWeaknessPenalty, roleDiversity, total } = synergyScore;
   const tier = scoreTierClasses(total);
   const grade = letterGrade(total);
+  const insights = computeInsights(members, synergyScore);
 
   return (
     <div className="flex flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-sm">
 
       {/* ── Score hero ───────────────────────────────────────────────── */}
       <div className="flex items-center gap-5 px-5 py-5">
-        {/* Ring */}
         <div
           className={`relative flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-[3px] ${tier.ring} ${tier.glow} transition-all duration-500`}
           aria-label={`Synergy score: ${total}`}
@@ -104,7 +147,6 @@ export function SynergyScorePanel({
           </div>
         </div>
 
-        {/* Grade + label */}
         <div className="flex flex-col gap-1.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">Synergy Score</p>
           <div className="flex items-center gap-2">
@@ -156,62 +198,14 @@ export function SynergyScorePanel({
         />
       </div>
 
-      {/* ── Team Analysis (AI) ───────────────────────────────────────── */}
+      {/* ── Team Analysis (algo) ─────────────────────────────────────── */}
       <div className="border-t border-zinc-800/60 px-5 py-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <FiZap size={11} className="text-violet-400" />
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">AI Analysis</p>
-          </div>
-          {(aiData || aiError) && (
-            <button
-              onClick={() => void retryAnalysis()}
-              disabled={aiLoading}
-              className="text-[10px] text-zinc-600 underline hover:text-zinc-400 transition-colors disabled:opacity-40"
-            >
-              Refresh
-            </button>
-          )}
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">Team Analysis</p>
+        <div className="flex flex-col gap-3">
+          {insights.map((ins) => (
+            <InsightRow key={ins.label} label={ins.label} text={ins.text} sentiment={ins.sentiment} />
+          ))}
         </div>
-
-        {/* Idle — show trigger button */}
-        {!aiData && !aiLoading && !aiError && (
-          <button
-            onClick={() => void retryAnalysis()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/8 px-4 py-3 text-sm font-semibold text-violet-400 transition-all duration-200 hover:border-violet-500/50 hover:bg-violet-500/15 hover:text-violet-300 active:scale-[0.98]"
-          >
-            <FiZap size={14} />
-            Analyse with AI
-          </button>
-        )}
-
-        {/* Loading skeleton */}
-        {aiLoading && (
-          <div className="flex flex-col gap-2.5">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                <div className="h-2.5 w-24 animate-pulse rounded bg-zinc-800" />
-                <div className="h-8 animate-pulse rounded bg-zinc-800/60" style={{ animationDelay: `${i * 80}ms` }} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {aiError && !aiLoading && (
-          <div className="rounded-lg border border-red-900/40 bg-red-950/20 px-3 py-3 text-[11px] text-red-400">
-            Request failed — check your API key or try again in a moment.
-          </div>
-        )}
-
-        {/* Results */}
-        {aiData && !aiLoading && (
-          <div className="flex flex-col gap-3.5">
-            {aiData.sections.map((section) => (
-              <AnalysisBlock key={section.label} section={section} />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* ── How is this calculated? ──────────────────────────────────── */}
@@ -299,23 +293,27 @@ function BarRow({ label, tooltip, value, valueColor, barValue, barMax, gradient,
   );
 }
 
-function AnalysisBlock({ section }: { section: AnalysisSection }) {
-  const sentimentStyles: Record<AnalysisSection['sentiment'], { dot: string; label: string }> = {
+interface InsightRowProps {
+  label: string;
+  text: string;
+  sentiment: 'good' | 'warn' | 'bad' | 'neutral';
+}
+
+function InsightRow({ label, text, sentiment }: InsightRowProps) {
+  const styles: Record<InsightRowProps['sentiment'], { dot: string; label: string }> = {
     good:    { dot: 'bg-emerald-400', label: 'text-emerald-400' },
     warn:    { dot: 'bg-yellow-400',  label: 'text-yellow-400' },
     bad:     { dot: 'bg-red-400',     label: 'text-red-400' },
     neutral: { dot: 'bg-zinc-500',    label: 'text-zinc-400' },
   };
-  const s = sentimentStyles[section.sentiment];
+  const s = styles[sentiment];
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.dot}`} />
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${s.label}`}>
-          {section.label}
-        </span>
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${s.label}`}>{label}</span>
       </div>
-      <p className="pl-3 text-[11px] leading-relaxed text-zinc-400">{section.text}</p>
+      <p className="pl-3 text-[11px] leading-relaxed text-zinc-400">{text}</p>
     </div>
   );
 }
