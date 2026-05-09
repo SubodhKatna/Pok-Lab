@@ -78,6 +78,8 @@ export interface PartialImageGameState {
 // --- Team Builder ---
 export interface TeamMember {
   pokemon: PokemonDetail;
+  /** Optional held item name (free text, session-only). */
+  heldItem?: string;
 }
 
 export interface SynergyBreakdown {
@@ -92,5 +94,4 @@ export interface TeamBuilderState {
   tournamentMode: boolean;
   synergyScore: SynergyBreakdown | null;
   tournamentScore: number | null;
-  suggestions: PokemonSummary[];
 }
