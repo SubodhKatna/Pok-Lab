@@ -1,7 +1,33 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { GAME_REGISTRY } from '@/registry/game-registry'
+import { useAuthContext } from '@/features/auth/AuthContext'
+import { loadGameScores, type GameScore } from '@/lib/firestore'
+
+const GAME_LABELS: Record<GameScore['game'], string> = {
+  'wordle': 'Pokémon Wordle',
+  'whos-that-pokemon': "Who's That Pokémon?",
+  'partial-image': 'Partial Image',
+}
 
 export function HomePage() {
+  const { user } = useAuthContext()
+  const [scores, setScores] = useState<GameScore[]>([])
+
+  useEffect(() => {
+    if (!user) {
+      void Promise.resolve().then(() => setScores([]))
+      return
+    }
+    void loadGameScores(user.uid).then(setScores)
+  }, [user])
+
+  // Compute personal bests per game
+  const personalBests = (['wordle', 'whos-that-pokemon', 'partial-image'] as GameScore['game'][]).map((game) => {
+    const gameScores = scores.filter((s) => s.game === game)
+    const best = gameScores.length > 0 ? Math.max(...gameScores.map((s) => s.score)) : null
+    return { game, best, count: gameScores.length }
+  })
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Hero */}
@@ -70,6 +96,37 @@ export function HomePage() {
           })}
         </div>
       </section>
+
+      {/* My Scores — only shown when signed in */}
+      {user && (
+        <section className="mx-auto max-w-5xl px-6 pb-20">
+          <h2 className="mb-6 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+            My Scores
+          </h2>
+          {scores.length === 0 ? (
+            <p className="text-sm text-zinc-600">Play some games to see your personal bests here.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {personalBests.map(({ game, best, count }) => (
+                <div
+                  key={game}
+                  className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 flex flex-col gap-2"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                    {GAME_LABELS[game]}
+                  </p>
+                  <p className="text-3xl font-black text-zinc-100 tabular-nums">
+                    {best !== null ? best : '—'}
+                  </p>
+                  <p className="text-xs text-zinc-600">
+                    {count} {count === 1 ? 'game' : 'games'} played
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }

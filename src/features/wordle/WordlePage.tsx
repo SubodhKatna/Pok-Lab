@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWordleGame } from './hooks/useWordleGame'
 import { ModeSelector } from './components/ModeSelector'
 import { GuessInput } from './components/GuessInput'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import type { WordleMode } from '@/shared/types/game-state'
 import type { PokemonDetail } from '@/shared/types/pokemon'
+import { useGameScore } from '@/features/auth/useGameScore'
 
 const ALL_GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -20,8 +21,20 @@ export function WordlePage() {
   const { state, startGame, submitGuess, resetGame, useHint1, useHint2, giveUp } = useWordleGame()
   const [pendingMode, setPendingMode] = useState<WordleMode>('attributes')
   const [genFilter, setGenFilter] = useState<number>(0)
+  const { recordScore } = useGameScore()
 
   const { status, guesses, sessionStats, mysteryPokemon, hint1Used, hint2Used } = state
+
+  // Save score when game ends
+  useEffect(() => {
+    if (status === 'won') {
+      // Score = max guesses (10) minus guesses used — higher is better
+      void recordScore('wordle', Math.max(10 - guesses.length, 1))
+    } else if (status === 'lost') {
+      void recordScore('wordle', 0)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, guesses.length])
 
   const handleStart = () => {
     const filter = genFilter === 0 ? [] : [genFilter]

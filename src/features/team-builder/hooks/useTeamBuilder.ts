@@ -5,12 +5,11 @@ import { buildPokemonDetail } from '@/shared/services/buildPokemonDetail';
 import {
   computeSynergyScore,
   computeTournamentScore,
-  computeSuggestions,
   computeTeamCoverage,
 } from '../scoring';
-import type { TeamMember, TeamBuilderState, SynergyBreakdown } from '@/shared/types/game-state';
+import type { TeamBuilderState, SynergyBreakdown } from '@/shared/types/game-state';
 import type { PokemonSummary, PokemonDetail } from '@/shared/types/pokemon';
-import type { TeamCoverageGrid, SuggestionItem } from '../scoring';
+import type { TeamCoverageGrid } from '../scoring';
 import { readPersistedTeam, persistTeam } from './useTeamPersistence';
 
 // ── Extended state ─────────────────────────────────────────────────────────────
@@ -19,7 +18,6 @@ export interface TeamBuilderExtendedState extends Omit<TeamBuilderState, 'sugges
   coverage: TeamCoverageGrid | null;
   isLoadingMember: boolean;
   error: string | null;
-  suggestions: SuggestionItem[];
 }
 
 const initialState: TeamBuilderExtendedState = {
@@ -27,7 +25,6 @@ const initialState: TeamBuilderExtendedState = {
   tournamentMode: false,
   synergyScore: null,
   tournamentScore: null,
-  suggestions: [],
   coverage: null,
   isLoadingMember: false,
   error: null,
@@ -47,7 +44,6 @@ type Action =
       payload: {
         synergyScore: SynergyBreakdown | null;
         tournamentScore: number | null;
-        suggestions: SuggestionItem[];
         coverage: TeamCoverageGrid | null;
       };
     };
@@ -103,7 +99,6 @@ function teamBuilderReducer(
         ...state,
         synergyScore: action.payload.synergyScore,
         tournamentScore: action.payload.tournamentScore,
-        suggestions: action.payload.suggestions,
         coverage: action.payload.coverage,
       };
     }
@@ -189,24 +184,12 @@ export function useTeamBuilder(): UseTeamBuilderReturn {
     const tournamentScore = state.tournamentMode ? computeTournamentScore(members) : null;
     const coverage = members.length > 0 ? computeTeamCoverage(members) : null;
 
-    // Build a lookup from cached details for suggestion computation
-    const getCandidateDetail = (id: number): TeamMember | undefined => {
-      const detail = queryClient.getQueryData<PokemonDetail>(['pokemon-detail', id]);
-      if (!detail) return undefined;
-      return { pokemon: detail };
-    };
-
-    const suggestions =
-      members.length > 0 && members.length < 6
-        ? computeSuggestions(members, pokemonList, getCandidateDetail)
-        : [];
-
     dispatch({
       type: 'RECOMPUTE',
-      payload: { synergyScore, tournamentScore, suggestions, coverage },
+      payload: { synergyScore, tournamentScore, coverage },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.members, state.tournamentMode, pokemonList]);
+  }, [state.members, state.tournamentMode]);
 
   // ── Public actions ───────────────────────────────────────────────────────────
   const addPokemon = useCallback(

@@ -1,4 +1,4 @@
-import type { PokemonType, PokemonSummary } from '@/shared/types/pokemon';
+import type { PokemonType } from '@/shared/types/pokemon';
 import type { TeamMember, SynergyBreakdown } from '@/shared/types/game-state';
 import { ALL_TYPES } from '@/features/pokedex/logic';
 
@@ -43,7 +43,7 @@ function defenseMultiplier(attackType: PokemonType, defenderTypes: PokemonType[]
  * Returns the set of attacking types that deal super-effective (>1×) damage
  * against a Pokémon with the given types.
  */
-function weaknessesOf(types: PokemonType[]): Set<PokemonType> {
+export function weaknessesOf(types: PokemonType[]): Set<PokemonType> {
   const result = new Set<PokemonType>();
   for (const atkType of ALL_TYPES) {
     if (defenseMultiplier(atkType, types) > 1) {
@@ -57,7 +57,7 @@ function weaknessesOf(types: PokemonType[]): Set<PokemonType> {
  * Returns the set of defending types that this Pokémon's types cover offensively
  * (i.e., at least one of its types deals super-effective damage against that defending type).
  */
-function offensiveCoverageOf(types: PokemonType[]): Set<PokemonType> {
+export function offensiveCoverageOf(types: PokemonType[]): Set<PokemonType> {
   const covered = new Set<PokemonType>();
   for (const defType of ALL_TYPES) {
     for (const atkType of types) {
@@ -217,50 +217,6 @@ export function computeTournamentScore(members: TeamMember[]): number | null {
   else if (tiers.size === 1) score += 5;
 
   return Math.min(100, score);
-}
-
-/** A suggested Pokémon with its projected synergy improvement. */
-export interface SuggestionItem {
-  pokemon: PokemonSummary;
-  /** How much the synergy total would increase by adding this Pokémon. */
-  improvement: number;
-}
-
-/**
- * Suggest up to 3 Pokémon from the candidate list that would most improve
- * the team's synergy score when added.
- *
- * Strategy: for each candidate not already on the team, compute the synergy
- * score of (current members + candidate) and rank by improvement.
- *
- * Returns an empty array if the team already has 6 members.
- *
- * Validates: Requirements 8.8
- */
-export function computeSuggestions(
-  members: TeamMember[],
-  candidates: PokemonSummary[],
-  getCandidateDetail: (id: number) => TeamMember | undefined,
-): SuggestionItem[] {
-  if (members.length >= 6 || members.length === 0) return [];
-
-  const currentIds = new Set(members.map((m) => m.pokemon.id));
-  const currentScore = computeSynergyScore(members)?.total ?? 0;
-
-  const scored: Array<{ candidate: PokemonSummary; improvement: number }> = [];
-
-  for (const candidate of candidates) {
-    if (currentIds.has(candidate.id)) continue;
-    const detail = getCandidateDetail(candidate.id);
-    if (!detail) continue;
-
-    const newScore = computeSynergyScore([...members, detail])?.total ?? 0;
-    const improvement = newScore - currentScore;
-    scored.push({ candidate, improvement });
-  }
-
-  scored.sort((a, b) => b.improvement - a.improvement);
-  return scored.slice(0, 3).map((s) => ({ pokemon: s.candidate, improvement: s.improvement }));
 }
 
 /**
