@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiSearch, FiChevronLeft, FiChevronRight, FiSave } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePokedex } from './hooks/usePokedex';
 import { PokemonHero, PokemonStats } from './components/PokemonHero';
@@ -9,10 +9,22 @@ import { EvolutionChain } from './components/EvolutionChain';
 import { MoveList } from './components/MoveList';
 import { PokedexFilters, PokemonGrid } from './components/PokedexGrid';
 import { computeTypeEffectiveness, computeOffense } from './logic';
+import { useAuthContext } from '@/features/auth/AuthContext';
+import {
+  saveFavourite,
+  removeFavourite,
+  loadFavourites,
+  saveComparison,
+  loadComparisons,
+  type SavedFavourite,
+  type SavedComparison,
+} from '@/lib/firestore';
+import type { PokemonSummary } from '@/shared/types/pokemon';
 
 export function PokedexPage() {
   const navigate = useNavigate();
   const { pokemonId } = useParams<{ pokemonId?: string }>();
+  const { user } = useAuthContext();
 
   const {
     state,
@@ -27,7 +39,69 @@ export function PokedexPage() {
   } = usePokedex();
 
   const [showFilters, setShowFilters] = useState(false);
-  const { selectedPokemon, isLoadingSelected, search, generationFilter, typeFilter } = state;
+  const [showFavourites, setShowFavourites] = useState(false);
+  const [favourites, setFavourites] = useState<SavedFavourite[]>([]);
+  const [savedComparisons, setSavedComparisons] = useState<SavedComparison[]>([]);
+  const [savingComparison, setSavingComparison] = useState(false);
+  const { selectedPokemon, isLoadingSelected, search, generationFilter, typeFilter, comparisonList } = state;
+
+  // Load favourites when user changes
+  useEffect(() => {
+    if (!user) {
+      void Promise.resolve().then(() => setFavourites([]))
+      return
+    }
+    void loadFavourites(user.uid).then(setFavourites);
+  }, [user]);
+
+  // Load saved comparisons when user changes
+  useEffect(() => {
+    if (!user) {
+      void Promise.resolve().then(() => setSavedComparisons([]))
+      return
+    }
+    void loadComparisons(user.uid).then(setSavedComparisons);
+  }, [user]);
+
+  const favouriteIds = useMemo(() => new Set(favourites.map((f) => f.pokemonId)), [favourites]);
+
+  const handleToggleFavourite = useCallback(async (p: PokemonSummary) => {
+    if (!user) return;
+    if (favouriteIds.has(p.id)) {
+      await removeFavourite(user.uid, p.id);
+    } else {
+      await saveFavourite(user.uid, {
+        pokemonId: p.id,
+        pokemonName: p.name,
+        sprite: p.sprite,
+      });
+    }
+    const updated = await loadFavourites(user.uid);
+    setFavourites(updated);
+  }, [user, favouriteIds]);
+
+  const handleSaveComparison = useCallback(async () => {
+    if (!user || comparisonList.length === 0) return;
+    setSavingComparison(true);
+    try {
+      await saveComparison(user.uid, {
+        label: comparisonList.map((p) => p.name).join(' vs '),
+        pokemonIds: comparisonList.map((p) => p.id),
+        pokemonNames: comparisonList.map((p) => p.name),
+        pokemonSprites: comparisonList.map((p) => p.sprite),
+      });
+      const updated = await loadComparisons(user.uid);
+      setSavedComparisons(updated);
+    } finally {
+      setSavingComparison(false);
+    }
+  }, [user, comparisonList]);
+
+  // Filtered list with favourites filter applied
+  const displayList = useMemo(() => {
+    if (!showFavourites) return filteredList;
+    return filteredList.filter((p) => favouriteIds.has(p.id));
+  }, [filteredList, showFavourites, favouriteIds]);
 
   // On mount / URL change: if there's a pokemonId param, load that pokemon
   useEffect(() => {
@@ -148,6 +222,50 @@ export function PokedexPage() {
             <Section title="Move Pool">
               <MoveList moves={selectedPokemon.moves} />
             </Section>
+
+            {/* Save Comparison */}
+            {user && comparisonList.length > 0 && (
+              <div className="flex items-center justify-between rounded-2xl border border-zinc-700 bg-zinc-900 px-5 py-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Comparison</p>
+                  <p className="text-sm text-zinc-300 capitalize">
+                    {comparisonList.map((p) => p.name).join(', ')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void handleSaveComparison()}
+                  disabled={savingComparison}
+                  className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 transition-all"
+                >
+                  <FiSave size={14} />
+                  {savingComparison ? 'Saving…' : 'Save Comparison'}
+                </button>
+              </div>
+            )}
+
+            {/* Saved comparisons dropdown */}
+            {user && savedComparisons.length > 0 && (
+              <Section title="Saved Comparisons">
+                <div className="flex flex-col gap-2">
+                  {savedComparisons.map((comp) => (
+                    <div key={comp.id} className="flex items-center gap-3 rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-2.5">
+                      <div className="flex -space-x-2 shrink-0">
+                        {comp.pokemonSprites.slice(0, 4).map((sprite, i) => (
+                          <img
+                            key={i}
+                            src={sprite}
+                            alt={comp.pokemonNames[i]}
+                            className="h-7 w-7 rounded-full border border-zinc-700 bg-zinc-900 object-contain"
+                          />
+                        ))}
+                      </div>
+                      <p className="flex-1 text-sm text-zinc-300 capitalize truncate">{comp.label}</p>
+                      <p className="text-xs text-zinc-600 shrink-0">{comp.createdAt.toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
           </div>
         </div>
       ) : (
@@ -170,12 +288,12 @@ export function PokedexPage() {
               onClick={() => setShowFilters((v) => !v)}
               className={[
                 'rounded-xl border px-3 py-2 text-xs font-semibold transition-all shrink-0',
-                showFilters || hasTypeFilter || generationFilter !== null
+                showFilters || hasTypeFilter || generationFilter !== null || showFavourites
                   ? 'border-sky-500/50 bg-sky-500/10 text-sky-300'
                   : 'border-white/8 bg-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-white/8',
               ].join(' ')}
             >
-              {hasTypeFilter || generationFilter !== null ? 'Filters \u25cf' : 'Filters'}
+              {hasTypeFilter || generationFilter !== null || showFavourites ? 'Filters ●' : 'Filters'}
             </button>
           </header>
 
@@ -184,18 +302,23 @@ export function PokedexPage() {
               generationFilter={generationFilter}
               typeFilter={typeFilter}
               hasTypeFilter={hasTypeFilter}
+              showFavourites={showFavourites}
+              hasFavourites={favourites.length > 0}
               onGeneration={setGenerationFilter}
               onToggleType={toggleTypeFilter}
               onClearType={clearTypeFilter}
+              onToggleFavourites={() => setShowFavourites((v) => !v)}
             />
           )}
 
           <div className="flex-1 p-4">
             <PokemonGrid
-              list={filteredList}
+              list={displayList}
               isLoading={isListLoading}
+              favouriteIds={favouriteIds}
               onSelect={(p) => void handleSelect(p)}
-              onClearFilters={() => { setSearch(''); setGenerationFilter(null); clearTypeFilter(); }}
+              onClearFilters={() => { setSearch(''); setGenerationFilter(null); clearTypeFilter(); setShowFavourites(false); }}
+              onToggleFavourite={user ? (p) => void handleToggleFavourite(p) : undefined}
             />
           </div>
         </div>

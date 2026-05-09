@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { FiChevronDown, FiMenu } from 'react-icons/fi'
+import { FiChevronDown, FiMenu, FiLogOut } from 'react-icons/fi'
+import { FcGoogle } from 'react-icons/fc'
 import { GiSwordsPower } from 'react-icons/gi'
 import {
   DropdownMenu,
@@ -15,6 +16,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { GAME_REGISTRY } from '@/registry/game-registry'
+import { useAuthContext } from '@/features/auth/AuthContext'
 
 // IDs that get their own top-level nav button (not in the Games dropdown)
 const TOP_LEVEL_IDS = ['pokedex', 'team-builder']
@@ -24,8 +26,9 @@ const GAME_DROPDOWN_IDS = ['wordle', 'whos-that-pokemon', 'partial-image']
 const topLevelModules = GAME_REGISTRY.filter((m) => TOP_LEVEL_IDS.includes(m.id))
 const gameDropdownModules = GAME_REGISTRY.filter((m) => GAME_DROPDOWN_IDS.includes(m.id))
 
-export function NavBar()  {
+export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { user, loading, signIn, signOut } = useAuthContext()
 
   return (
     <nav className="bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -110,10 +113,99 @@ export function NavBar()  {
               {mod.name}
             </NavLink>
           ))}
+
+        {/* Auth — desktop */}
+        <div className="ml-2 pl-2 border-l border-zinc-800">
+          {!loading && (
+            user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-800 transition-colors"
+                    aria-label="Account menu"
+                  >
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName ?? 'User avatar'}
+                        className="w-7 h-7 rounded-full border border-zinc-700"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
+                        {(user.displayName ?? 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm text-zinc-300 max-w-[120px] truncate hidden lg:inline">
+                      {user.displayName ?? user.email}
+                    </span>
+                    <FiChevronDown size={12} className="text-zinc-500" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="bg-zinc-900 border border-zinc-800 rounded-xl min-w-44"
+                >
+                  <div className="px-3 py-2 border-b border-zinc-800">
+                    <p className="text-xs font-semibold text-zinc-100 truncate">{user.displayName}</p>
+                    <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={() => void signOut()}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-b-xl transition-colors"
+                  >
+                    <FiLogOut size={14} />
+                    Sign out
+                  </button>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <button
+                onClick={() => void signIn()}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-zinc-700 bg-zinc-800 text-sm font-medium text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 hover:bg-zinc-700 transition-all"
+              >
+                <FcGoogle size={16} />
+                Sign in
+              </button>
+            )
+          )}
+        </div>
       </div>
 
-      {/* Mobile hamburger */}
-      <div className="flex md:hidden">
+      {/* Mobile: auth + hamburger */}
+      <div className="flex items-center gap-2 md:hidden">
+        {/* Mobile auth button */}
+        {!loading && (
+          user ? (
+            <button
+              onClick={() => void signOut()}
+              className="flex items-center gap-1.5 p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+              aria-label="Sign out"
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName ?? 'User avatar'}
+                  className="w-7 h-7 rounded-full border border-zinc-700"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
+                  {(user.displayName ?? 'U')[0].toUpperCase()}
+                </div>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => void signIn()}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-700 bg-zinc-800 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-all"
+            >
+              <FcGoogle size={14} />
+              Sign in
+            </button>
+          )
+        )}
+
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
             <button
@@ -196,6 +288,49 @@ export function NavBar()  {
                     </NavLink>
                   ))}
               </div>
+
+              {/* Auth in mobile sheet */}
+              {!loading && (
+                <div className="pt-4 mt-2 border-t border-zinc-800">
+                  {user ? (
+                    <div className="flex flex-col gap-2 px-3">
+                      <div className="flex items-center gap-2">
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt={user.displayName ?? 'User avatar'}
+                            className="w-8 h-8 rounded-full border border-zinc-700"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-bold text-zinc-300">
+                            {(user.displayName ?? 'U')[0].toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold text-zinc-100 truncate">{user.displayName}</span>
+                          <span className="text-xs text-zinc-500 truncate">{user.email}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { void signOut(); setMobileOpen(false) }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                      >
+                        <FiLogOut size={14} />
+                        Sign out
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { void signIn(); setMobileOpen(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                    >
+                      <FcGoogle size={16} />
+                      Sign in with Google
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </SheetContent>
         </Sheet>

@@ -4,7 +4,7 @@ import { useTeamBuilder } from './hooks/useTeamBuilder';
 import { TeamSlot } from './components/TeamSlot';
 import { TypeCoverageGrid } from './components/TypeCoverageGrid';
 import { SynergyScorePanel } from './components/SynergyScorePanel';
-import { SuggestionPanel } from './components/SuggestionPanel';
+import { MyTeamsPanel } from './components/MyTeamsPanel';
 import type { PokemonSummary } from '@/shared/types/pokemon';
 
 const SLOT_COUNT = 6;
@@ -18,7 +18,6 @@ export function TeamBuilderPage() {
     tournamentMode,
     synergyScore,
     tournamentScore,
-    suggestions,
     coverage,
     isLoadingMember,
     error,
@@ -27,6 +26,17 @@ export function TeamBuilderPage() {
   const handleSelect = (pokemon: PokemonSummary) => {
     void addPokemon(pokemon);
   };
+
+  const handleLoadTeam = (pokemonList: PokemonSummary[]) => {
+    // Remove all current members first, then add new ones sequentially
+    // We remove by ID from the current snapshot to avoid stale closure issues
+    const currentIds = members.map((m) => m.pokemon.id)
+    currentIds.forEach((id) => removePokemon(id))
+    // Use setTimeout to let the removals flush before adding
+    setTimeout(() => {
+      pokemonList.forEach((p) => void addPokemon(p))
+    }, 0)
+  }
 
   const handleCopyLink = () => {
     void navigator.clipboard.writeText(window.location.href).then(() => {
@@ -171,12 +181,9 @@ export function TeamBuilderPage() {
               members={members}
             />
 
-            <SuggestionPanel
-              suggestions={suggestions}
-              memberCount={members.length}
+            <MyTeamsPanel
               members={members}
-              synergyScore={synergyScore}
-              onAdd={handleSelect}
+              onLoadTeam={handleLoadTeam}
             />
           </div>
         </div>
