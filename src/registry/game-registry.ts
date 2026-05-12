@@ -16,6 +16,7 @@ export const GAME_REGISTRY: GameModule[] = [
     icon: GiCardRandom,
     path: '/wordle',
     component: WordlePage,
+    requiresAuth: true,
   },
   {
     id: 'whos-that-pokemon',
@@ -24,6 +25,7 @@ export const GAME_REGISTRY: GameModule[] = [
     icon: GiMagnifyingGlass,
     path: '/whos-that-pokemon',
     component: WTPPage,
+    requiresAuth: true,
   },
   {
     id: 'partial-image',
@@ -32,6 +34,7 @@ export const GAME_REGISTRY: GameModule[] = [
     icon: GiSwordsPower,
     path: '/partial-image',
     component: PartialImagePage,
+    requiresAuth: true,
   },
   {
     id: 'pokedex',
@@ -48,5 +51,6 @@ export const GAME_REGISTRY: GameModule[] = [
     icon: RiTeamFill,
     path: '/team-builder',
     component: TeamBuilderPage,
+    requiresAuth: true,
   },
 ]
