@@ -188,7 +188,6 @@ export function useTeamBuilder(): UseTeamBuilderReturn {
       type: 'RECOMPUTE',
       payload: { synergyScore, tournamentScore, coverage },
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.members, state.tournamentMode]);
 
   // ── Public actions ───────────────────────────────────────────────────────────

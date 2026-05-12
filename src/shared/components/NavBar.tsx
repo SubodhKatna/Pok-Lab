@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { FiChevronDown, FiMenu, FiLogOut } from 'react-icons/fi'
+import { FiChevronDown, FiMenu, FiLogOut, FiLock, FiUser } from 'react-icons/fi'
 import { FcGoogle } from 'react-icons/fc'
 import { GiSwordsPower } from 'react-icons/gi'
 import {
@@ -29,12 +29,13 @@ const gameDropdownModules = GAME_REGISTRY.filter((m) => GAME_DROPDOWN_IDS.includ
 export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, loading, signIn, signOut } = useAuthContext()
+  const homeHref = user ? '/home' : '/'
 
   return (
     <nav className="bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between">
       {/* Logo */}
       <NavLink
-        to="/"
+        to={homeHref}
         className="flex items-center gap-2 text-zinc-100 font-semibold text-base tracking-tight shrink-0 hover:text-white transition-colors"
       >
         <img src="/favicon.svg" alt="PokéLab logo" className="w-7 h-7" />
@@ -77,21 +78,42 @@ export function NavBar() {
             align="start"
             className="bg-zinc-900 border border-zinc-800 rounded-xl min-w-48"
           >
-            {gameDropdownModules.map((mod) => (
-              <NavLink
-                key={mod.id}
-                to={mod.path}
-                className={({ isActive }) => `
-                  flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm cursor-pointer
-                  ${isActive
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100'}
-                `}
-              >
-                <mod.icon size={16} />
-                {mod.name}
-              </NavLink>
-            ))}
+            {gameDropdownModules.map((mod) => {
+              const locked = !!mod.requiresAuth && !user
+              if (locked) {
+                return (
+                  <button
+                    key={mod.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void signIn()}
+                    className="w-full flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-lg text-sm text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label={`${mod.name} (locked)`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <mod.icon size={16} />
+                      {mod.name}
+                    </span>
+                    <FiLock size={14} className="opacity-70" />
+                  </button>
+                )
+              }
+              return (
+                <NavLink
+                  key={mod.id}
+                  to={mod.path}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm cursor-pointer
+                    ${isActive
+                      ? 'bg-zinc-700 text-zinc-100'
+                      : 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100'}
+                  `}
+                >
+                  <mod.icon size={16} />
+                  {mod.name}
+                </NavLink>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -99,19 +121,34 @@ export function NavBar() {
         {topLevelModules
           .filter((m) => m.id === 'team-builder')
           .map((mod) => (
-            <NavLink
-              key={mod.id}
-              to={mod.path}
-              className={({ isActive }) => `
-                flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150
-                ${isActive
-                  ? 'bg-zinc-700 text-zinc-100'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}
-              `}
-            >
-              <mod.icon size={16} />
-              {mod.name}
-            </NavLink>
+            (!!mod.requiresAuth && !user) ? (
+              <button
+                key={mod.id}
+                type="button"
+                disabled={loading}
+                onClick={() => void signIn()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                aria-label={`${mod.name} (locked)`}
+              >
+                <mod.icon size={16} />
+                {mod.name}
+                <FiLock size={14} className="ml-1 opacity-70" />
+              </button>
+            ) : (
+              <NavLink
+                key={mod.id}
+                to={mod.path}
+                className={({ isActive }) => `
+                  flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150
+                  ${isActive
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}
+                `}
+              >
+                <mod.icon size={16} />
+                {mod.name}
+              </NavLink>
+            )
           ))}
 
         {/* Auth — desktop */}
@@ -150,6 +187,13 @@ export function NavBar() {
                     <p className="text-xs font-semibold text-zinc-100 truncate">{user.displayName}</p>
                     <p className="text-xs text-zinc-500 truncate">{user.email}</p>
                   </div>
+                  <NavLink
+                    to="/profile"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                  >
+                    <FiUser size={14} />
+                    Profile
+                  </NavLink>
                   <button
                     onClick={() => void signOut()}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-b-xl transition-colors"
@@ -250,28 +294,22 @@ export function NavBar() {
                   Games
                 </p>
                 {gameDropdownModules.map((mod) => (
-                  <NavLink
-                    key={mod.id}
-                    to={mod.path}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) => `
-                      w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 text-left
-                      ${isActive
-                        ? 'bg-zinc-700 text-zinc-100'
-                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}
-                    `}
-                  >
-                    <mod.icon size={16} />
-                    {mod.name}
-                  </NavLink>
-                ))}
-              </div>
-
-              {/* Team Builder */}
-              <div className="pt-2">
-                {topLevelModules
-                  .filter((m) => m.id === 'team-builder')
-                  .map((mod) => (
+                  (!!mod.requiresAuth && !user) ? (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => { void signIn(); setMobileOpen(false) }}
+                      className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 text-left text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                      aria-label={`${mod.name} (locked)`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <mod.icon size={16} />
+                        {mod.name}
+                      </span>
+                      <FiLock size={14} className="opacity-70" />
+                    </button>
+                  ) : (
                     <NavLink
                       key={mod.id}
                       to={mod.path}
@@ -286,6 +324,46 @@ export function NavBar() {
                       <mod.icon size={16} />
                       {mod.name}
                     </NavLink>
+                  )
+                ))}
+              </div>
+
+              {/* Team Builder */}
+              <div className="pt-2">
+                {topLevelModules
+                  .filter((m) => m.id === 'team-builder')
+                  .map((mod) => (
+                    (!!mod.requiresAuth && !user) ? (
+                      <button
+                        key={mod.id}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => { void signIn(); setMobileOpen(false) }}
+                        className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 text-left text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-label={`${mod.name} (locked)`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <mod.icon size={16} />
+                          {mod.name}
+                        </span>
+                        <FiLock size={14} className="opacity-70" />
+                      </button>
+                    ) : (
+                      <NavLink
+                        key={mod.id}
+                        to={mod.path}
+                        onClick={() => setMobileOpen(false)}
+                        className={({ isActive }) => `
+                          w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 text-left
+                          ${isActive
+                            ? 'bg-zinc-700 text-zinc-100'
+                            : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}
+                        `}
+                      >
+                        <mod.icon size={16} />
+                        {mod.name}
+                      </NavLink>
+                    )
                   ))}
               </div>
 
@@ -312,6 +390,14 @@ export function NavBar() {
                           <span className="text-xs text-zinc-500 truncate">{user.email}</span>
                         </div>
                       </div>
+                      <NavLink
+                        to="/profile"
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                      >
+                        <FiUser size={14} />
+                        Profile
+                      </NavLink>
                       <button
                         onClick={() => { void signOut(); setMobileOpen(false) }}
                         className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
