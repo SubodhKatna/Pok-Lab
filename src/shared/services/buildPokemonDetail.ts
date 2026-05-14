@@ -1,6 +1,8 @@
 import { fetchPokemon, fetchPokemonSpecies, fetchMove, fetchEvolutionChain } from './pokeapi';
 import type { RawEvolutionChainLink } from './pokeapi';
-import type { PokemonDetail, MoveEntry, EvolutionNode, PokemonType } from '@/shared/types/pokemon';
+import type { PokemonDetail, MoveEntry, EvolutionNode, PokemonVariant, VariantKind, PokemonType } from '@/shared/types/pokemon';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseGeneration(genName: string): number {
   const map: Record<string, number> = {
@@ -11,40 +13,50 @@ function parseGeneration(genName: string): number {
   return map[genName] ?? 0;
 }
 
-async function getEvolutionStage(evolvesFrom: { name: string } | null): Promise<number> {
-  if (!evolvesFrom) return 1;
-  try {
-    const parentSpecies = await fetchPokemonSpecies(evolvesFrom.name);
-    return parentSpecies.evolves_from_species ? 3 : 2;
-  } catch { return 2; }
-}
-
 function extractEvolutionChainId(url: string): number {
-  const match = url.match(/\/evolution-chain\/(\d+)\//);
-  return match ? parseInt(match[1], 10) : 0;
+  const m = url.match(/\/evolution-chain\/(\d+)\//);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 function extractSpeciesId(url: string): number {
-  const match = url.match(/\/pokemon-species\/(\d+)\//);
-  return match ? parseInt(match[1], 10) : 0;
+  const m = url.match(/\/pokemon-species\/(\d+)\//);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 function extractPokemonId(url: string): number {
-  const match = url.match(/\/pokemon\/(\d+)\//);
-  return match ? parseInt(match[1], 10) : 0;
+  const m = url.match(/\/pokemon\/(\d+)\//);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
-async function fetchVariants(speciesName: string): Promise<Array<{ name: string; id: number }>> {
+function classifyVariant(name: string): VariantKind {
+  if (/-mega$|-mega-x$|-mega-y$/.test(name)) return 'mega';
+  if (/-gmax$/.test(name)) return 'gmax';
+  if (/-dmax$/.test(name)) return 'dmax';
+  if (/-alola$|-galar$|-hisui$|-paldea$|-alolan$|-galarian$|-hisuian$|-paldean$/.test(name)) return 'regional';
+  return 'other';
+}
+
+const COSTUME_PATTERN = /-(?:original|alola-cap|hoenn-cap|sinnoh-cap|unova-cap|kalos-cap|partner-cap|world-cap|starter|belle|libre|phd|pop-star|rock-star|cosplay|totem|own-tempo|busted|hangry|noice|gulping|gorging|rapid-strike|single-strike|ice-rider|shadow-rider|eternamax|primal|ash|pikachu-cap|pikachu-original|pikachu-hoenn|pikachu-sinnoh|pikachu-unova|pikachu-kalos|pikachu-alola|pikachu-partner|pikachu-world)$/;
+
+function parseVariants(varieties: Array<{ is_default: boolean; pokemon: { name: string; url: string } }>): PokemonVariant[] {
+  return varieties
+    .filter((v) => !v.is_default)
+    .map((v) => ({ name: v.pokemon.name, id: extractPokemonId(v.pokemon.url), kind: classifyVariant(v.pokemon.name) }))
+    .filter((v) => v.id > 0 && v.kind !== 'other' && !COSTUME_PATTERN.test(v.name));
+}
+
+async function fetchVariantsForNode(
+  speciesName: string,
+  cache: Map<string, PokemonVariant[]>,
+): Promise<PokemonVariant[]> {
+  if (cache.has(speciesName)) return cache.get(speciesName)!;
   try {
-    const species = await fetchPokemonSpecies(speciesName);
-    return species.varieties
-      .filter((v) => !v.is_default)
-      .map((v) => ({
-        name: v.pokemon.name,
-        id: extractPokemonId(v.pokemon.url),
-      }))
-      .filter((v) => v.id > 0);
+    const s = await fetchPokemonSpecies(speciesName);
+    const variants = parseVariants(s.varieties).filter((v) => v.kind === 'regional');
+    cache.set(speciesName, variants);
+    return variants;
   } catch {
+    cache.set(speciesName, []);
     return [];
   }
 }
@@ -65,12 +77,27 @@ function flattenChain(link: RawEvolutionChainLink, isRoot = true): EvolutionNode
   };
 }
 
+function deriveEvolutionStage(chain: EvolutionNode[], targetId: number): number {
+  function search(node: EvolutionNode, depth: number): number {
+    if (node.id === targetId) return depth;
+    for (const child of node.children) {
+      const found = search(child, depth + 1);
+      if (found > 0) return found;
+    }
+    return 0;
+  }
+  return chain.length === 0 ? 1 : (search(chain[0], 1) || 1);
+}
 
-export async function buildPokemonDetail(nameOrId: string | number): Promise<PokemonDetail> {
-  const [raw, species] = await Promise.all([
-    fetchPokemon(nameOrId),
-    fetchPokemonSpecies(nameOrId),
-  ]);
+// ── Move cache (module-level, persists across navigations) ───────────────────
+
+const moveCache = new Map<string, MoveEntry>();
+
+// ── Core detail (fast — no moves) ────────────────────────────────────────────
+
+export async function buildPokemonCore(nameOrId: string | number): Promise<PokemonDetail> {
+  const raw = await fetchPokemon(nameOrId);
+  const species = await fetchPokemonSpecies(raw.species.name);
 
   const sprite =
     raw.sprites.other['official-artwork'].front_default ??
@@ -78,83 +105,39 @@ export async function buildPokemonDetail(nameOrId: string | number): Promise<Pok
 
   const statsMap: Record<string, number> = {};
   for (const s of raw.stats) statsMap[s.stat.name] = s.base_stat;
-
   const types = raw.types.sort((a, b) => a.slot - b.slot).map((t) => t.type.name) as PokemonType[];
 
   const flavorEntry = species.flavor_text_entries.find((e) => e.language.name === 'en');
-  const description = flavorEntry
-    ? flavorEntry.flavor_text.replace(/\f/g, ' ').replace(/\n/g, ' ')
-    : '';
+  const description = flavorEntry ? flavorEntry.flavor_text.replace(/\f/g, ' ').replace(/\n/g, ' ') : '';
 
-  // Deduplicate moves — keep best learn method per move
-  const METHOD_PRIORITY: Record<string, number> = { 'level-up': 0, 'machine': 1, 'egg': 2, 'tutor': 3 };
-  const bestMoveMap = new Map<string, { name: string; learnMethod: string; levelLearnedAt: number }>();
-  for (const m of raw.moves) {
-    const vgd = m.version_group_details[0];
-    if (!vgd) continue;
-    const method = vgd.move_learn_method.name;
-    const level = vgd.level_learned_at;
-    const existing = bestMoveMap.get(m.move.name);
-    const priority = METHOD_PRIORITY[method] ?? 99;
-    const existingPriority = existing ? (METHOD_PRIORITY[existing.learnMethod] ?? 99) : 999;
-    if (!existing || priority < existingPriority) {
-      bestMoveMap.set(m.move.name, { name: m.move.name, learnMethod: method, levelLearnedAt: level });
-    }
-  }
+  const variantCache = new Map<string, PokemonVariant[]>();
+  const currentForms = parseVariants(species.varieties);
+  variantCache.set(species.name, currentForms.filter((v) => v.kind === 'regional'));
 
-  // Fetch ALL moves in parallel batches of 20 to avoid overwhelming the API
-  const moveEntries = Array.from(bestMoveMap.values());
-  const BATCH = 20;
-  const moves: MoveEntry[] = [];
-  for (let i = 0; i < moveEntries.length; i += BATCH) {
-    const batch = moveEntries.slice(i, i + BATCH);
-    const results = await Promise.allSettled(
-      batch.map((m) => fetchMove(m.name).then((mv) => ({ mv, meta: m }))),
-    );
-    for (const r of results) {
-      if (r.status !== 'fulfilled') continue;
-      const { mv, meta } = r.value;
-      const effectEntry = mv.effect_entries.find((e) => e.language.name === 'en');
-      moves.push({
-        name: mv.name,
-        type: mv.type.name as PokemonType,
-        category: mv.damage_class.name as MoveEntry['category'],
-        power: mv.power,
-        accuracy: mv.accuracy,
-        pp: mv.pp,
-        learnMethod: meta.learnMethod,
-        levelLearnedAt: meta.levelLearnedAt,
-        effect: effectEntry?.short_effect ?? '',
-      });
-    }
-  }
-
-  // Evolution chain — fetch variants for each node
-  let evolutionChain: EvolutionNode[] = [];
-  try {
-    const chainId = extractEvolutionChainId(species.evolution_chain.url);
-    if (chainId > 0) {
+  const evolutionChain = await (async (): Promise<EvolutionNode[]> => {
+    try {
+      const chainId = extractEvolutionChainId(species.evolution_chain.url);
+      if (chainId <= 0) return [];
       const rawChain = await fetchEvolutionChain(chainId);
       const root = flattenChain(rawChain.chain, true);
-      // Fetch variants for all nodes in parallel
       const allNodes: EvolutionNode[] = [];
-      function collectNodes(node: EvolutionNode) {
-        allNodes.push(node);
-        node.children.forEach(collectNodes);
-      }
+      function collectNodes(n: EvolutionNode) { allNodes.push(n); n.children.forEach(collectNodes); }
       collectNodes(root);
-      await Promise.all(
-        allNodes.map(async (node) => {
-          node.variants = await fetchVariants(node.name);
-        }),
-      );
-      evolutionChain = [root];
-    }
-  } catch { evolutionChain = []; }
+      await Promise.all(allNodes.map(async (node) => {
+        node.variants = await fetchVariantsForNode(node.name, variantCache);
+      }));
+      return [root];
+    } catch { return []; }
+  })();
 
-  const evolutionStage = await getEvolutionStage(species.evolves_from_species);
+  const forms = currentForms.filter((v) => v.kind !== 'other');
+  const evolutionStage = deriveEvolutionStage(evolutionChain, raw.id);
 
-  return {
+  // Store raw move metadata on the detail so moves can be fetched separately
+  // We attach it as a non-rendered field used by buildPokemonMoves
+  const rawMovesMeta = raw.moves;
+
+  const detail: PokemonDetail & { _rawMoves?: typeof rawMovesMeta } = {
     id: raw.id, name: raw.name, sprite, types,
     stats: {
       hp: statsMap['hp'] ?? 0, attack: statsMap['attack'] ?? 0,
@@ -166,6 +149,77 @@ export async function buildPokemonDetail(nameOrId: string | number): Promise<Pok
     generation: parseGeneration(species.generation.name),
     color: species.color.name,
     eggGroups: species.egg_groups.map((g) => g.name),
-    evolutionStage, description, moves, evolutionChain,
+    evolutionStage, description,
+    moves: [], // populated separately
+    evolutionChain, forms,
+    _rawMoves: rawMovesMeta,
   };
+
+  return detail;
+}
+
+// ── Moves (slow — fetches each move individually, cached) ────────────────────
+
+export async function buildPokemonMoves(
+  rawMoves: Array<{
+    move: { name: string };
+    version_group_details: Array<{ level_learned_at: number; move_learn_method: { name: string } }>;
+  }>,
+): Promise<MoveEntry[]> {
+  const METHOD_PRIORITY: Record<string, number> = { 'level-up': 0, 'machine': 1, 'egg': 2, 'tutor': 3 };
+
+  const bestMap = new Map<string, { name: string; learnMethod: string; levelLearnedAt: number }>();
+  for (const m of rawMoves) {
+    const vgd = m.version_group_details[0];
+    if (!vgd) continue;
+    const method = vgd.move_learn_method.name;
+    const level = vgd.level_learned_at;
+    const existing = bestMap.get(m.move.name);
+    const priority = METHOD_PRIORITY[method] ?? 99;
+    if (!existing || priority < (METHOD_PRIORITY[existing.learnMethod] ?? 99)) {
+      bestMap.set(m.move.name, { name: m.move.name, learnMethod: method, levelLearnedAt: level });
+    }
+  }
+
+  const entries = Array.from(bestMap.values());
+  const toFetch = entries.filter((e) => !moveCache.has(e.name));
+
+  // All uncached moves in parallel — browser connection pool handles throttling
+  await Promise.allSettled(
+    toFetch.map(async (meta) => {
+      try {
+        const mv = await fetchMove(meta.name);
+        const effectEntry = mv.effect_entries.find((e) => e.language.name === 'en');
+        moveCache.set(meta.name, {
+          name: mv.name,
+          type: mv.type.name as PokemonType,
+          category: mv.damage_class.name as MoveEntry['category'],
+          power: mv.power,
+          accuracy: mv.accuracy,
+          pp: mv.pp,
+          learnMethod: meta.learnMethod,
+          levelLearnedAt: meta.levelLearnedAt,
+          effect: effectEntry?.short_effect ?? '',
+        });
+      } catch { /* skip */ }
+    }),
+  );
+
+  return entries.flatMap((meta) => {
+    const cached = moveCache.get(meta.name);
+    if (!cached) return [];
+    return [{ ...cached, learnMethod: meta.learnMethod, levelLearnedAt: meta.levelLearnedAt }];
+  });
+}
+
+// ── Legacy combined builder (kept for compatibility) ─────────────────────────
+
+export async function buildPokemonDetail(nameOrId: string | number): Promise<PokemonDetail> {
+  const core = await buildPokemonCore(nameOrId) as PokemonDetail & { _rawMoves?: unknown[] };
+  const rawMoves = core._rawMoves as Parameters<typeof buildPokemonMoves>[0] | undefined;
+  if (rawMoves) {
+    core.moves = await buildPokemonMoves(rawMoves);
+    delete core._rawMoves;
+  }
+  return core;
 }

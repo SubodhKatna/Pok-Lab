@@ -1,9 +1,9 @@
 import { useReducer, useCallback } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { usePokemonList } from '@/shared/services/hooks/usePokemonList';
-import { buildPokemonDetail } from '@/shared/services/buildPokemonDetail';
+import { buildPokemonCore, buildPokemonMoves } from '@/shared/services/buildPokemonDetail';
 import { fetchPokemonIdsByType } from '@/shared/services/pokeapi';
-import type { PokemonDetail, PokemonSummary, PokemonType } from '@/shared/types/pokemon';
+import type { PokemonDetail, PokemonSummary, PokemonType, MoveEntry } from '@/shared/types/pokemon';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -164,30 +164,42 @@ export function usePokedex(): UsePokedexReturn {
     return true;
   });
 
-  const fetchDetail = useCallback(
-    async (nameOrId: string | number): Promise<PokemonDetail> => {
-      const cached = queryClient.getQueryData<PokemonDetail>(['pokemon-detail', nameOrId]);
-      if (cached) return cached;
-      return queryClient.fetchQuery<PokemonDetail>({
-        queryKey: ['pokemon-detail', nameOrId],
-        queryFn: () => buildPokemonDetail(nameOrId),
-        staleTime: Infinity,
-      });
-    },
-    [queryClient],
-  );
-
   const selectPokemon = useCallback(
     async (pokemon: PokemonSummary): Promise<void> => {
       dispatch({ type: 'SET_LOADING_SELECTED', payload: true });
       try {
-        const detail = await fetchDetail(pokemon.id);
-        dispatch({ type: 'SET_SELECTED', payload: detail });
+        const cached = queryClient.getQueryData<PokemonDetail>(['pokemon-detail', pokemon.id]);
+        if (cached) {
+          dispatch({ type: 'SET_SELECTED', payload: cached });
+          return;
+        }
+
+        // Phase 1: show page immediately with core data (no moves yet)
+        const core = await queryClient.fetchQuery<PokemonDetail & { _rawMoves?: unknown[] }>({
+          queryKey: ['pokemon-core', pokemon.id],
+          queryFn: () => buildPokemonCore(pokemon.id),
+          staleTime: Infinity,
+        });
+        const rawMoves = core._rawMoves as Parameters<typeof buildPokemonMoves>[0] | undefined;
+        delete core._rawMoves;
+        dispatch({ type: 'SET_SELECTED', payload: { ...core } });
+
+        // Phase 2: fetch moves in background, then patch them in
+        if (rawMoves) {
+          const moves = await queryClient.fetchQuery<MoveEntry[]>({
+            queryKey: ['pokemon-moves', pokemon.id],
+            queryFn: () => buildPokemonMoves(rawMoves),
+            staleTime: Infinity,
+          });
+          const full: PokemonDetail = { ...core, moves };
+          queryClient.setQueryData(['pokemon-detail', pokemon.id], full);
+          dispatch({ type: 'SET_SELECTED', payload: full });
+        }
       } catch {
         dispatch({ type: 'SET_LOADING_SELECTED', payload: false });
       }
     },
-    [fetchDetail],
+    [queryClient],
   );
 
   const clearSelected = useCallback(() => {

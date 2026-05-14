@@ -30,6 +30,7 @@ export interface RawSpecies {
 export interface RawPokemon {
   id: number;
   name: string;
+  species: { name: string; url: string };
   sprites: {
     other: {
       'official-artwork': {
