@@ -164,37 +164,6 @@ export function usePokedex(): UsePokedexReturn {
     return true;
   });
 
-  const fetchDetail = useCallback(
-    async (nameOrId: string | number): Promise<PokemonDetail> => {
-      const cached = queryClient.getQueryData<PokemonDetail>(['pokemon-detail', nameOrId]);
-      if (cached) return cached;
-
-      // Phase 1: fetch core (fast — no moves)
-      const core = await queryClient.fetchQuery<PokemonDetail & { _rawMoves?: unknown[] }>({
-        queryKey: ['pokemon-core', nameOrId],
-        queryFn: () => buildPokemonCore(nameOrId),
-        staleTime: Infinity,
-      });
-
-      // Phase 2: fetch moves in background (slow)
-      const rawMoves = core._rawMoves as Parameters<typeof buildPokemonMoves>[0] | undefined;
-      if (rawMoves) {
-        const moves = await queryClient.fetchQuery<MoveEntry[]>({
-          queryKey: ['pokemon-moves', nameOrId],
-          queryFn: () => buildPokemonMoves(rawMoves),
-          staleTime: Infinity,
-        });
-        core.moves = moves;
-        delete core._rawMoves;
-      }
-
-      // Cache the full detail
-      queryClient.setQueryData(['pokemon-detail', nameOrId], core);
-      return core;
-    },
-    [queryClient],
-  );
-
   const selectPokemon = useCallback(
     async (pokemon: PokemonSummary): Promise<void> => {
       dispatch({ type: 'SET_LOADING_SELECTED', payload: true });

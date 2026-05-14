@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { FiSearch, FiChevronLeft, FiChevronRight, FiSave } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePokedex } from './hooks/usePokedex';
@@ -120,8 +120,13 @@ export function PokedexPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pokemonId]);
 
-  // Reset active form when selected pokemon changes
-  useEffect(() => { setActiveForm(null); }, [selectedPokemon?.id]);
+  // Reset active form when selected pokemon changes — use ref comparison to avoid
+  // calling setState synchronously inside an effect body
+  const prevSelectedIdRef = React.useRef<number | undefined>(undefined);
+  if (prevSelectedIdRef.current !== selectedPokemon?.id) {
+    prevSelectedIdRef.current = selectedPokemon?.id;
+    if (activeForm !== null) setActiveForm(null);
+  }
 
   // Handle form variant selection — fetch raw data and lift into activeForm
   const handleFormSelect = useCallback(async (variant: PokemonVariant) => {
