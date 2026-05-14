@@ -31,6 +31,8 @@ export interface PokemonDetail extends PokemonSummary {
   description: string;  // Pokédex flavor text
   moves: MoveEntry[];
   evolutionChain: EvolutionNode[];
+  /** All non-default forms for this species (mega, gmax, regional, etc.) */
+  forms: PokemonVariant[];
 }
 
 export interface MoveEntry {
@@ -45,10 +47,18 @@ export interface MoveEntry {
   effect: string;            // short effect description
 }
 
+export type VariantKind = 'regional' | 'mega' | 'gmax' | 'dmax' | 'other';
+
+export interface PokemonVariant {
+  name: string;
+  id: number;
+  kind: VariantKind;
+}
+
 export interface EvolutionNode {
   name: string;
   id: number;
   trigger: string; // e.g. "level-up at 16", "use Fire Stone"
   children: EvolutionNode[];
-  variants?: Array<{ name: string; id: number }>; // regional forms / variants
+  variants?: PokemonVariant[];
 }
